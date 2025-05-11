@@ -5,40 +5,45 @@ import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
 import { sendSiteEmail } from '@/lib/email';
 
+// Nova forma de configurar a rota - para substituir a configuração export const config
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const preferredRegion = 'auto';
+
 export async function POST(request) {
-  const body = await request.text();
-  const signature = headers().get('stripe-signature');
-  
-  if (!signature) {
-    return NextResponse.json(
-      { error: 'Missing Stripe signature' },
-      { status: 400 }
-    );
-  }
-  
-  let event;
-  
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (error) {
-    console.error(`Webhook signature verification failed: ${error.message}`);
-    return NextResponse.json(
-      { error: 'Invalid signature' },
-      { status: 400 }
-    );
-  }
-  
-  // Handle the event
-  try {
+    const body = await request.text();
+    const signature = headers().get('stripe-signature');
+    
+    if (!signature) {
+      return NextResponse.json(
+        { error: 'Missing Stripe signature' },
+        { status: 400 }
+      );
+    }
+    
+    let event;
+    
+    try {
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (error) {
+      console.error(`Webhook signature verification failed: ${error.message}`);
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400 }
+      );
+    }
+    
+    // Handle the event
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object;
       
       // Get metadata
-      const { siteId, slug, customerEmail } = paymentIntent.metadata;
+      const { siteId, customerEmail } = paymentIntent.metadata;
       
       if (!siteId) {
         console.error('Missing siteId in metadata');
@@ -76,10 +81,3 @@ export async function POST(request) {
     );
   }
 }
-
-// Disable body parsing for webhooks
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
