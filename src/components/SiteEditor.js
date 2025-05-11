@@ -378,6 +378,14 @@ const SiteEditor = () => {
                         error={formErrors.title}
                         required
                       />
+
+                      <Input
+                        label="Custom Age (deixe em branco para calcular automaticamente)"
+                        value={formData.birthday.customAge || ''}
+                        onChange={(e) => handleTemplateTextChange('birthday', 'customAge', e.target.value)}
+                        placeholder="Ex: 30"
+                        type="number"
+                        />
                       
                       {/* Special Date (conditional based on template) */}
                       {(formData.templateType === 'anniversary' || formData.templateType === 'birthday' || formData.templateType === 'declaration') && (

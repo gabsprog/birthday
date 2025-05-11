@@ -181,6 +181,7 @@ const BirthdayTemplate = ({
     messageSectionTitle: 'Birthday Message',
     buttonText: 'Click For Birthday Surprise',
     footerText: 'Made with love',
+    customAge: '',
     // Default cake styles
     cakeStyles: {
       // These can all be overridden by the user
@@ -215,6 +216,12 @@ const BirthdayTemplate = ({
   
   // Get age from specialDate if provided
   const getAge = () => {
+    // Se há uma idade personalizada definida, use-a
+    if (texts.customAge) {
+        return texts.customAge;
+    }
+
+    // Caso contrário, calcule a partir da data
     if (!specialDate) return '?';
     const birthDate = new Date(specialDate);
     const today = new Date();
@@ -222,7 +229,7 @@ const BirthdayTemplate = ({
     const monthDiff = today.getMonth() - birthDate.getMonth();
     
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+        age--;
     }
     
     return age;

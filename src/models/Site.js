@@ -55,6 +55,10 @@ const BirthdayCustomTextSchema = new mongoose.Schema({
     type: String,
     default: 'Happy Birthday!'
   },
+  customAge: {
+    type: String,
+    required: false
+  },
   aboutSectionTitle: {
     type: String,
     default: 'About You'
