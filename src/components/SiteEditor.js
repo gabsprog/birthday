@@ -12,13 +12,16 @@ import Input from './ui/Input';
 import Textarea from './ui/Textarea';
 import ImageUpload from './ui/ImageUpload';
 import { validateYoutubeUrl, isValidEmail } from '@/lib/utils';
+import Select from './ui/Select';
+import { Tab } from '@headlessui/react';
 
 const SiteEditor = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [currentTab, setCurrentTab] = useState(0);
   
-  // Form state
+  // Extended form state for full customization
   const [formData, setFormData] = useState({
     templateType: 'birthday',
     title: '',
@@ -27,9 +30,71 @@ const SiteEditor = () => {
     youtubeLink: '',
     customerEmail: '',
     images: [],
+    
+    // Custom birthday template text fields
+    birthday: {
+      headerTitle: 'Happy Birthday!',
+      aboutSectionTitle: 'About You',
+      favoritesSectionTitle: 'What I Love About You',
+      gallerySectionTitle: 'Memory Gallery',
+      messageSectionTitle: 'Birthday Message',
+      favorites: [
+        { title: 'Your Smile', description: 'A smile that lights up any room and brightens everyone around. Your smile has the power to transform bad days into special moments.' },
+        { title: 'Your Intelligence', description: 'The way you think and solve problems is admirable. Your brilliant mind sees solutions where others only see obstacles.' },
+        { title: 'Your Heart', description: 'A heart full of love and compassion, always ready to help others and make a difference in the lives of those around you.' },
+        { title: 'Your Determination', description: 'When you set your mind to something, there\'s no obstacle that can stop you. Your willpower and perseverance are inspiring.' },
+        { title: 'Your Authenticity', description: 'You are genuinely yourself, without masks or pretensions. Your authenticity is rare and precious in today\'s world.' }
+      ],
+      aboutCards: [
+        { title: 'Amazing Person ❤️', description: 'You are the most incredible person I\'ve ever met. A life journey marked by achievements, smiles, and special moments. Your presence brightens any room, and your smile can transform the gloomiest days into colorful ones.' },
+        { title: 'Our Story', description: 'From the very first moment, I knew you were special. The way we met, every moment together, every shared laugh. We\'ve built memories that I\'ll cherish forever.' },
+        { title: 'Unforgettable Moments', description: 'Every moment by your side becomes unforgettable. Your unique way of seeing the world, your determination, and your generous heart make any experience more special.' }
+      ],
+      footerText: 'Made with love',
+      buttonText: 'Click For Birthday Surprise'
+    },
+    
+    // Custom anniversary template text fields
+    anniversary: {
+      headerTitle: 'Our Anniversary',
+      timeTogetherTitle: 'Time Together',
+      journeyTitle: 'Our Journey Together',
+      momentsTitle: 'Our Special Moments',
+      messageTitle: 'Anniversary Message',
+      journeyMilestones: [
+        { title: 'First Meeting', description: 'The day our paths crossed for the first time. It was the beginning of a beautiful journey.' },
+        { title: 'First Date', description: 'The butterflies, the excitement, the conversations that seemed to never end.' },
+        { title: 'Official Relationship', description: 'The day we decided to commit to each other, beginning this beautiful journey together.' },
+        { title: 'Special Milestone', description: 'A significant moment that made our bond even stronger. The journey continues with love growing each day.' }
+      ],
+      songTitle: 'Our Special Song',
+      songCaption: 'This melody speaks the words my heart cannot express',
+      footerText: 'Happy Anniversary!'
+    },
+    
+    // Custom declaration template text fields
+    declaration: {
+      headerTitle: 'Declaration of Love',
+      headerQuote: 'Just as the stars are constant in the night sky, so is my love for you: eternal, bright, and guiding my way.',
+      journeyTitle: 'Our Journey Among the Stars',
+      universeTitle: 'The Universe of Our Love',
+      universeSymbols: [
+        { title: 'Loyalty', description: 'Like a distant star that remains constant, my loyalty to you will never waver.' },
+        { title: 'Infinite Love', description: 'As vast as the universe itself, my love for you knows no limits or boundaries.' },
+        { title: 'Destiny', description: 'Like celestial bodies drawn together by gravity, we were meant to find each other.' }
+      ],
+      songTitle: 'The Soundtrack of Our Love',
+      songCaption: 'This melody speaks the words my heart cannot express',
+      messageTitle: 'My Declaration of Love',
+      signatureText: 'With all my love,',
+      signatureName: 'Always Yours',
+      promiseTitle: 'My Promise',
+      promiseText: 'I promise to love you, to cherish you, and to stand by your side through all of life\'s adventures. Like the stars that light up the darkest night, I will be there to illuminate your path, forever and always.',
+      footerText: 'Made with love'
+    }
   });
   
-  // Handle input changes
+  // Handle input changes for main fields
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -38,6 +103,53 @@ const SiteEditor = () => {
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: '' }));
     }
+  };
+
+  // Handle template-specific text changes
+  const handleTemplateTextChange = (templateType, field, value, index = null) => {
+    setFormData(prev => {
+      const updatedData = { ...prev };
+      
+      if (index !== null) {
+        // Handle array fields (like favorites, milestones, etc.)
+        if (field.includes('.')) {
+          // Handle nested properties in arrays (e.g., "favorites.title")
+          const [arrayField, property] = field.split('.');
+          updatedData[templateType][arrayField][index][property] = value;
+        } else {
+          // Handle direct array updates
+          updatedData[templateType][field][index] = value;
+        }
+      } else if (field.includes('.')) {
+        // Handle nested properties (e.g., "aboutCards.0.title")
+        const parts = field.split('.');
+        let target = updatedData[templateType];
+        
+        // Navigate to the nested object
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!isNaN(part)) {
+            // It's an array index
+            target = target[parts[i-1]][parseInt(part)];
+          } else if (i < parts.length - 2 && !isNaN(parts[i+1])) {
+            // Skip - this is an array name and will be handled in the next iteration
+            continue;
+          } else {
+            // It's an object property
+            if (!target[part]) target[part] = {};
+            target = target[part];
+          }
+        }
+        
+        // Set the final value
+        target[parts[parts.length - 1]] = value;
+      } else {
+        // Handle direct property update
+        updatedData[templateType][field] = value;
+      }
+      
+      return updatedData;
+    });
   };
   
   // Handle template selection
@@ -151,6 +263,7 @@ const SiteEditor = () => {
   
   // Render template preview based on the selected template
   const renderTemplatePreview = () => {
+    // Common preview props
     const previewProps = {
       title: formData.title || 'Your Title Here',
       message: formData.message || 'Your message will appear here. Write something special for your loved one.',
@@ -162,14 +275,41 @@ const SiteEditor = () => {
     
     switch (formData.templateType) {
       case 'birthday':
-        return <BirthdayTemplate {...previewProps} />;
+        return <BirthdayTemplate 
+          {...previewProps} 
+          customTexts={formData.birthday}
+        />;
       case 'anniversary':
-        return <AnniversaryTemplate {...previewProps} />;
+        return <AnniversaryTemplate 
+          {...previewProps}
+          customTexts={formData.anniversary}
+        />;
       case 'declaration':
-        return <DeclarationTemplate {...previewProps} />;
+        return <DeclarationTemplate 
+          {...previewProps}
+          customTexts={formData.declaration}
+        />;
       default:
         return <BirthdayTemplate {...previewProps} />;
     }
+  };
+  
+  // Add a new item to an array field
+  const addArrayItem = (templateType, field, defaultItem) => {
+    setFormData(prev => {
+      const updatedData = { ...prev };
+      updatedData[templateType][field] = [...updatedData[templateType][field], defaultItem];
+      return updatedData;
+    });
+  };
+  
+  // Remove an item from an array field
+  const removeArrayItem = (templateType, field, index) => {
+    setFormData(prev => {
+      const updatedData = { ...prev };
+      updatedData[templateType][field] = updatedData[templateType][field].filter((_, i) => i !== index);
+      return updatedData;
+    });
   };
   
   return (
@@ -184,83 +324,597 @@ const SiteEditor = () => {
               onSelectTemplate={handleTemplateSelect}
             />
             
-            {/* Title */}
-            <Input
-              id="title"
-              name="title"
-              label="Title"
-              placeholder="E.g., Happy Birthday Sarah! or John & Lisa's Anniversary"
-              value={formData.title}
-              onChange={handleChange}
-              error={formErrors.title}
-              required
-            />
-            
-            {/* Special Date (conditional based on template) */}
-            {(formData.templateType === 'anniversary' || formData.templateType === 'declaration') && (
-              <Input
-                id="specialDate"
-                name="specialDate"
-                type="date"
-                label={formData.templateType === 'anniversary' ? 'Anniversary Date' : 'Special Date (Optional)'}
-                value={formData.specialDate}
-                onChange={handleChange}
-                error={formErrors.specialDate}
-                required={formData.templateType === 'anniversary'}
-              />
-            )}
-            
-            {/* Message */}
-            <Textarea
-              id="message"
-              name="message"
-              label="Your Message"
-              placeholder="Write your special message here..."
-              value={formData.message}
-              onChange={handleChange}
-              error={formErrors.message}
-              required
-              rows={6}
-            />
-            
-            {/* YouTube Link */}
-            <Input
-              id="youtubeLink"
-              name="youtubeLink"
-              label="YouTube Video Link (Optional)"
-              placeholder="E.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-              value={formData.youtubeLink}
-              onChange={handleChange}
-              error={formErrors.youtubeLink}
-            />
-            
-            {/* Image Upload */}
-            <div className="space-y-2">
-              <ImageUpload
-                onImageUpload={handleImageUpload}
-                onImageRemove={handleImageRemove}
-                maxImages={5}
-                uploadedImages={formData.images}
-                label="Upload Images (Max 5)"
-              />
-              {isLoading && <p className="text-sm text-gray-500">Uploading images...</p>}
+            {/* Tab navigation for form sections */}
+            <div className="mb-4">
+              <Tab.Group selectedIndex={currentTab} onChange={setCurrentTab}>
+                <Tab.List className="flex space-x-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+                  <Tab 
+                    className={({ selected }) =>
+                      `w-full py-2.5 text-sm font-medium leading-5 rounded-lg transition-all
+                       ${selected 
+                         ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                         : 'text-gray-600 dark:text-gray-400 hover:bg-white/[0.12] hover:text-primary-500'
+                       }`
+                    }
+                  >
+                    Basic Info
+                  </Tab>
+                  <Tab 
+                    className={({ selected }) =>
+                      `w-full py-2.5 text-sm font-medium leading-5 rounded-lg transition-all
+                       ${selected 
+                         ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                         : 'text-gray-600 dark:text-gray-400 hover:bg-white/[0.12] hover:text-primary-500'
+                       }`
+                    }
+                  >
+                    Custom Text
+                  </Tab>
+                  <Tab 
+                    className={({ selected }) =>
+                      `w-full py-2.5 text-sm font-medium leading-5 rounded-lg transition-all
+                       ${selected 
+                         ? 'bg-white dark:bg-gray-700 shadow text-primary-600 dark:text-primary-400' 
+                         : 'text-gray-600 dark:text-gray-400 hover:bg-white/[0.12] hover:text-primary-500'
+                       }`
+                    }
+                  >
+                    Media
+                  </Tab>
+                </Tab.List>
+                
+                <Tab.Panels className="mt-4">
+                  {/* Basic Info Panel */}
+                  <Tab.Panel>
+                    <div className="space-y-4">
+                      {/* Title */}
+                      <Input
+                        id="title"
+                        name="title"
+                        label="Title"
+                        placeholder="E.g., Happy Birthday Sarah! or John & Lisa's Anniversary"
+                        value={formData.title}
+                        onChange={handleChange}
+                        error={formErrors.title}
+                        required
+                      />
+                      
+                      {/* Special Date (conditional based on template) */}
+                      {(formData.templateType === 'anniversary' || formData.templateType === 'birthday' || formData.templateType === 'declaration') && (
+                        <Input
+                          id="specialDate"
+                          name="specialDate"
+                          type="date"
+                          label={
+                            formData.templateType === 'anniversary' 
+                              ? 'Anniversary Date' 
+                              : formData.templateType === 'birthday'
+                                ? 'Birth Date'
+                                : 'Special Date'
+                          }
+                          value={formData.specialDate}
+                          onChange={handleChange}
+                          error={formErrors.specialDate}
+                          required={formData.templateType === 'anniversary'}
+                        />
+                      )}
+                      
+                      {/* Main Message */}
+                      <Textarea
+                        id="message"
+                        name="message"
+                        label="Your Message"
+                        placeholder="Write your special message here..."
+                        value={formData.message}
+                        onChange={handleChange}
+                        error={formErrors.message}
+                        required
+                        rows={8}
+                      />
+                      
+                      {/* Email */}
+                      <Input
+                        id="customerEmail"
+                        name="customerEmail"
+                        type="email"
+                        label="Your Email"
+                        placeholder="We'll send the site link to this email"
+                        value={formData.customerEmail}
+                        onChange={handleChange}
+                        error={formErrors.customerEmail}
+                        required
+                      />
+                    </div>
+                  </Tab.Panel>
+                  
+                  {/* Custom Text Panel */}
+                  <Tab.Panel>
+                    <div className="space-y-4">
+                      {/* Render different customization options based on template type */}
+                      {formData.templateType === 'birthday' && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Birthday Template Text</h3>
+                          
+                          {/* Section Titles */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Section Titles</h4>
+                            
+                            <Input
+                              label="Header Title"
+                              value={formData.birthday.headerTitle}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'headerTitle', e.target.value)}
+                              placeholder="Happy Birthday!"
+                            />
+                            
+                            <Input
+                              label="About Section Title"
+                              value={formData.birthday.aboutSectionTitle}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'aboutSectionTitle', e.target.value)}
+                              placeholder="About You"
+                            />
+                            
+                            <Input
+                              label="Favorites Section Title"
+                              value={formData.birthday.favoritesSectionTitle}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'favoritesSectionTitle', e.target.value)}
+                              placeholder="What I Love About You"
+                            />
+                            
+                            <Input
+                              label="Gallery Section Title"
+                              value={formData.birthday.gallerySectionTitle}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'gallerySectionTitle', e.target.value)}
+                              placeholder="Memory Gallery"
+                            />
+                            
+                            <Input
+                              label="Message Section Title"
+                              value={formData.birthday.messageSectionTitle}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'messageSectionTitle', e.target.value)}
+                              placeholder="Birthday Message"
+                            />
+                          </div>
+                          
+                          {/* Favorite Things Section */}
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium text-gray-700 dark:text-gray-300">Favorite Things</h4>
+                              <Button 
+                                onClick={() => addArrayItem('birthday', 'favorites', { title: 'New Item', description: 'Description here' })}
+                                variant="outline" 
+                                size="sm"
+                              >
+                                Add Item
+                              </Button>
+                            </div>
+                            
+                            {formData.birthday.favorites.map((item, index) => (
+                              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-medium">Item {index + 1}</h5>
+                                  <Button 
+                                    onClick={() => removeArrayItem('birthday', 'favorites', index)}
+                                    variant="danger" 
+                                    size="sm"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                                
+                                <Input
+                                  label="Title"
+                                  value={item.title}
+                                  onChange={(e) => handleTemplateTextChange('birthday', 'favorites.title', e.target.value, index)}
+                                />
+                                
+                                <Textarea
+                                  label="Description"
+                                  value={item.description}
+                                  onChange={(e) => handleTemplateTextChange('birthday', 'favorites.description', e.target.value, index)}
+                                  rows={2}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* About Cards Section */}
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium text-gray-700 dark:text-gray-300">About Cards</h4>
+                              <Button 
+                                onClick={() => addArrayItem('birthday', 'aboutCards', { title: 'New Card', description: 'Card description here' })}
+                                variant="outline" 
+                                size="sm"
+                              >
+                                Add Card
+                              </Button>
+                            </div>
+                            
+                            {formData.birthday.aboutCards.map((card, index) => (
+                              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-medium">Card {index + 1}</h5>
+                                  <Button 
+                                    onClick={() => removeArrayItem('birthday', 'aboutCards', index)}
+                                    variant="danger" 
+                                    size="sm"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                                
+                                <Input
+                                  label="Title"
+                                  value={card.title}
+                                  onChange={(e) => handleTemplateTextChange('birthday', 'aboutCards.title', e.target.value, index)}
+                                />
+                                
+                                <Textarea
+                                  label="Description"
+                                  value={card.description}
+                                  onChange={(e) => handleTemplateTextChange('birthday', 'aboutCards.description', e.target.value, index)}
+                                  rows={3}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Other Elements */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Other Elements</h4>
+                            
+                            <Input
+                              label="Button Text"
+                              value={formData.birthday.buttonText}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'buttonText', e.target.value)}
+                              placeholder="Click For Birthday Surprise"
+                            />
+                            
+                            <Input
+                              label="Footer Text"
+                              value={formData.birthday.footerText}
+                              onChange={(e) => handleTemplateTextChange('birthday', 'footerText', e.target.value)}
+                              placeholder="Made with love"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {formData.templateType === 'anniversary' && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Anniversary Template Text</h3>
+                          
+                          {/* Section Titles */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Section Titles</h4>
+                            
+                            <Input
+                              label="Header Title"
+                              value={formData.anniversary.headerTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'headerTitle', e.target.value)}
+                              placeholder="Our Anniversary"
+                            />
+                            
+                            <Input
+                              label="Time Together Title"
+                              value={formData.anniversary.timeTogetherTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'timeTogetherTitle', e.target.value)}
+                              placeholder="Time Together"
+                            />
+                            
+                            <Input
+                              label="Journey Title"
+                              value={formData.anniversary.journeyTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'journeyTitle', e.target.value)}
+                              placeholder="Our Journey Together"
+                            />
+                            
+                            <Input
+                              label="Moments Title"
+                              value={formData.anniversary.momentsTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'momentsTitle', e.target.value)}
+                              placeholder="Our Special Moments"
+                            />
+                            
+                            <Input
+                              label="Message Title"
+                              value={formData.anniversary.messageTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'messageTitle', e.target.value)}
+                              placeholder="Anniversary Message"
+                            />
+                          </div>
+                          
+                          {/* Journey Milestones */}
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium text-gray-700 dark:text-gray-300">Journey Milestones</h4>
+                              <Button 
+                                onClick={() => addArrayItem('anniversary', 'journeyMilestones', { title: 'New Milestone', description: 'Description here' })}
+                                variant="outline" 
+                                size="sm"
+                              >
+                                Add Milestone
+                              </Button>
+                            </div>
+                            
+                            {formData.anniversary.journeyMilestones.map((milestone, index) => (
+                              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-medium">Milestone {index + 1}</h5>
+                                  <Button 
+                                    onClick={() => removeArrayItem('anniversary', 'journeyMilestones', index)}
+                                    variant="danger" 
+                                    size="sm"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                                
+                                <Input
+                                  label="Title"
+                                  value={milestone.title}
+                                  onChange={(e) => handleTemplateTextChange('anniversary', 'journeyMilestones.title', e.target.value, index)}
+                                />
+                                
+                                <Textarea
+                                  label="Description"
+                                  value={milestone.description}
+                                  onChange={(e) => handleTemplateTextChange('anniversary', 'journeyMilestones.description', e.target.value, index)}
+                                  rows={2}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Song Section */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Song Section</h4>
+                            
+                            <Input
+                              label="Song Title"
+                              value={formData.anniversary.songTitle}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'songTitle', e.target.value)}
+                              placeholder="Our Special Song"
+                            />
+                            
+                            <Input
+                              label="Song Caption"
+                              value={formData.anniversary.songCaption}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'songCaption', e.target.value)}
+                              placeholder="This melody speaks the words my heart cannot express"
+                            />
+                          </div>
+                          
+                          {/* Footer */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Footer</h4>
+                            
+                            <Input
+                              label="Footer Text"
+                              value={formData.anniversary.footerText}
+                              onChange={(e) => handleTemplateTextChange('anniversary', 'footerText', e.target.value)}
+                              placeholder="Happy Anniversary!"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {formData.templateType === 'declaration' && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Declaration Template Text</h3>
+                          
+                          {/* Header Section */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Header Section</h4>
+                            
+                            <Input
+                              label="Header Title"
+                              value={formData.declaration.headerTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'headerTitle', e.target.value)}
+                              placeholder="Declaration of Love"
+                            />
+                            
+                            <Textarea
+                              label="Header Quote"
+                              value={formData.declaration.headerQuote}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'headerQuote', e.target.value)}
+                              placeholder="Just as the stars are constant in the night sky, so is my love for you: eternal, bright, and guiding my way."
+                              rows={3}
+                            />
+                          </div>
+                          
+                          {/* Section Titles */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Section Titles</h4>
+                            
+                            <Input
+                              label="Journey Title"
+                              value={formData.declaration.journeyTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'journeyTitle', e.target.value)}
+                              placeholder="Our Journey Among the Stars"
+                            />
+                            
+                            <Input
+                              label="Universe Title"
+                              value={formData.declaration.universeTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'universeTitle', e.target.value)}
+                              placeholder="The Universe of Our Love"
+                            />
+                            
+                            <Input
+                              label="Song Title"
+                              value={formData.declaration.songTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'songTitle', e.target.value)}
+                              placeholder="The Soundtrack of Our Love"
+                            />
+                            
+                            <Input
+                              label="Message Title"
+                              value={formData.declaration.messageTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'messageTitle', e.target.value)}
+                              placeholder="My Declaration of Love"
+                            />
+                            
+                            <Input
+                              label="Promise Title"
+                              value={formData.declaration.promiseTitle}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'promiseTitle', e.target.value)}
+                              placeholder="My Promise"
+                            />
+                          </div>
+                          
+                          {/* Universe Symbols */}
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium text-gray-700 dark:text-gray-300">Universe Symbols</h4>
+                              <Button 
+                                onClick={() => addArrayItem('declaration', 'universeSymbols', { title: 'New Symbol', description: 'Description here' })}
+                                variant="outline" 
+                                size="sm"
+                              >
+                                Add Symbol
+                              </Button>
+                            </div>
+                            
+                            {formData.declaration.universeSymbols.map((symbol, index) => (
+                              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-medium">Symbol {index + 1}</h5>
+                                  <Button 
+                                    onClick={() => removeArrayItem('declaration', 'universeSymbols', index)}
+                                    variant="danger" 
+                                    size="sm"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                                
+                                <Input
+                                  label="Title"
+                                  value={symbol.title}
+                                  onChange={(e) => handleTemplateTextChange('declaration', 'universeSymbols.title', e.target.value, index)}
+                                />
+                                
+                                <Textarea
+                                  label="Description"
+                                  value={symbol.description}
+                                  onChange={(e) => handleTemplateTextChange('declaration', 'universeSymbols.description', e.target.value, index)}
+                                  rows={2}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Song Section */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Song Section</h4>
+                            
+                            <Input
+                              label="Song Caption"
+                              value={formData.declaration.songCaption}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'songCaption', e.target.value)}
+                              placeholder="This melody speaks the words my heart cannot express"
+                            />
+                          </div>
+                          
+                          {/* Signature */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Signature</h4>
+                            
+                            <Input
+                              label="Signature Text"
+                              value={formData.declaration.signatureText}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'signatureText', e.target.value)}
+                              placeholder="With all my love,"
+                            />
+                            
+                            <Input
+                              label="Signature Name"
+                              value={formData.declaration.signatureName}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'signatureName', e.target.value)}
+                              placeholder="Always Yours"
+                            />
+                          </div>
+                          
+                          {/* Promise */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Promise</h4>
+                            
+                            <Textarea
+                              label="Promise Text"
+                              value={formData.declaration.promiseText}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'promiseText', e.target.value)}
+                              placeholder="I promise to love you, to cherish you, and to stand by your side through all of life's adventures."
+                              rows={4}
+                            />
+                          </div>
+                          
+                          {/* Footer */}
+                          <div className="space-y-4">
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">Footer</h4>
+                            
+                            <Input
+                              label="Footer Text"
+                              value={formData.declaration.footerText}
+                              onChange={(e) => handleTemplateTextChange('declaration', 'footerText', e.target.value)}
+                              placeholder="Made with love"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Tab.Panel>
+                  
+                  {/* Media Panel */}
+                  <Tab.Panel>
+                    <div className="space-y-6">
+                      {/* YouTube Link */}
+                      <div>
+                        <Input
+                          id="youtubeLink"
+                          name="youtubeLink"
+                          label="YouTube Video Link (Optional)"
+                          placeholder="E.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                          value={formData.youtubeLink}
+                          onChange={handleChange}
+                          error={formErrors.youtubeLink}
+                        />
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          {formData.templateType === 'birthday' && "Add a special birthday song or video!"}
+                          {formData.templateType === 'anniversary' && "Add your special song or a memorable video from your journey together."}
+                          {formData.templateType === 'declaration' && "Add a romantic song that expresses your feelings."}
+                        </p>
+                      </div>
+                      
+                      {/* Image Upload */}
+                      <div className="space-y-2">
+                        <ImageUpload
+                          onImageUpload={handleImageUpload}
+                          onImageRemove={handleImageRemove}
+                          maxImages={5}
+                          uploadedImages={formData.images}
+                          label="Upload Images (Max 5)"
+                        />
+                        {isLoading && <p className="text-sm text-gray-500">Uploading images...</p>}
+                        
+                        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                          <h4 className="font-medium text-blue-700 dark:text-blue-300 mb-2">Image Tips</h4>
+                          <ul className="list-disc list-inside text-sm text-blue-600 dark:text-blue-400 space-y-1">
+                            <li>Upload high-quality images for the best visual experience</li>
+                            <li>The first image will be featured prominently in all templates</li>
+                            <li>For {formData.templateType === 'birthday' ? 'birthday templates' : formData.templateType === 'anniversary' ? 'anniversary templates' : 'declaration templates'}, landscape orientation works best</li>
+                            <li>Images will be automatically optimized for the best display</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </Tab.Panel>
+                </Tab.Panels>
+              </Tab.Group>
             </div>
             
-            {/* Email */}
-            <Input
-              id="customerEmail"
-              name="customerEmail"
-              type="email"
-              label="Your Email"
-              placeholder="We'll send the site link to this email"
-              value={formData.customerEmail}
-              onChange={handleChange}
-              error={formErrors.customerEmail}
-              required
-            />
-            
             {/* Submit Button */}
-            <div className="pt-4">
+            <div className="pt-6">
               <Button
                 type="submit"
                 disabled={isLoading}
@@ -280,7 +934,25 @@ const SiteEditor = () => {
         {/* Preview Column */}
         <div className="lg:col-span-6 xl:col-span-5">
           <div className="sticky top-24">
-            <h2 className="text-xl font-semibold mb-4">Preview</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Preview</h2>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTab(0)}
+                >
+                  Edit Basic Info
+                </Button>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTab(1)}
+                >
+                  Edit Text
+                </Button>
+              </div>
+            </div>
             <div className="border-2 border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-[600px] relative">
               <div className="absolute inset-0 overflow-y-auto">
                 {renderTemplatePreview()}

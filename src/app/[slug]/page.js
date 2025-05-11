@@ -73,6 +73,15 @@ export default async function SitePage({ params }) {
       mode: 'view',
     };
     
+    // Add custom texts for each template type
+    if (site.templateType === 'birthday') {
+      templateProps.customTexts = site.birthdayTexts || {};
+    } else if (site.templateType === 'anniversary') {
+      templateProps.customTexts = site.anniversaryTexts || {};
+    } else if (site.templateType === 'declaration') {
+      templateProps.customTexts = site.declarationTexts || {};
+    }
+    
     let TemplateComponent;
     
     switch (site.templateType) {

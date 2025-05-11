@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.2",
     "@stripe/stripe-js": "^2.4.0",
     "axios": "^1.6.5",
     "cloudinary": "^1.41.3",
