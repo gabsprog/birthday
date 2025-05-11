@@ -24,10 +24,7 @@ const nextConfig = {
   webpack(config) {
     return config;
   },
-  // Experimental features
-  experimental: {
-    appDir: true,
-  },
+  // Remover a seção experimental com appDir
 };
 
 module.exports = nextConfig;

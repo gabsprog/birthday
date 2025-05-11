@@ -356,17 +356,17 @@ const BirthdayTemplate = ({
     return '';
   };
 
-  const handleSurpriseClick = (e) => {
-    e.preventDefault();
-    setHiddenContent(false);
-    setShowConfetti(true);
-    
-    // Scroll to hidden content after revealing
-    setTimeout(() => {
-      const content = document.getElementById('hiddenBirthdayContent');
-      if (content) content.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+    const handleSurpriseClick = (e) => {
+        e.preventDefault();
+        setHiddenContent(false);
+        setShowConfetti(true);
+        
+        // Scroll to hidden content after revealing
+        setTimeout(() => {
+            const content = document.getElementById('hiddenBirthdayContent');
+            if (content) content.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+    };
   
   return (
     <div className={`${mode === 'preview' ? 'scale-[0.6] origin-top' : ''}`}>

@@ -39,7 +39,8 @@ export default async function SitePage({ params }) {
     const site = await Site.findOne({ slug });
     
     if (!site) {
-      notFound();
+      console.log(`Site not found with slug: ${slug}`);
+      return notFound();
     }
     
     // Check if the site is paid or not expired

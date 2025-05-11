@@ -38,7 +38,7 @@ export async function POST(request) {
       const paymentIntent = event.data.object;
       
       // Get metadata
-      const { siteId, customerEmail } = paymentIntent.metadata;
+      const { siteId, slug, customerEmail } = paymentIntent.metadata;
       
       if (!siteId) {
         console.error('Missing siteId in metadata');

@@ -27,12 +27,3 @@ export async function createPaymentIntent(amount, metadata) {
     throw error;
   }
 }
-
-export async function retrievePaymentIntent(id) {
-  try {
-    return await stripe.paymentIntents.retrieve(id);
-  } catch (error) {
-    console.error('Error retrieving payment intent:', error);
-    throw error;
-  }
-}

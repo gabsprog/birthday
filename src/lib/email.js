@@ -20,8 +20,8 @@ export async function sendSiteEmail(email, site) {
     width: 300,
     margin: 2,
     color: {
-      dark: '#010599FF',
-      light: '#FFBF60FF',
+      dark: '#f05252',
+      light: '#FFFFFF',
     },
   });
   
@@ -29,33 +29,33 @@ export async function sendSiteEmail(email, site) {
   const htmlContent = `
     <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <img src="${process.env.NEXT_PUBLIC_BASE_URL}/images/logo.svg" alt="Birthday Love" style="width: 150px; height: auto;" />
+        <h1 style="color: #f05252; margin-bottom: 5px;">BirthdayLove</h1>
       </div>
       
       <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
-        <h1 style="color: #f05252; font-size: 24px; margin-bottom: 20px; text-align: center;">Your special site is ready!</h1>
+        <h2 style="color: #f05252; font-size: 24px; margin-bottom: 20px; text-align: center;">Seu site especial está pronto!</h2>
         
         <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 25px;">
-          Thank you for creating a special site with BirthdayLove. Your site is now live and ready to be shared with your loved one!
+          Obrigado por criar um site especial com BirthdayLove. Seu site está ativo e pronto para ser compartilhado com sua pessoa especial!
         </p>
         
         <div style="text-align: center; margin: 30px 0;">
           <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 200px; height: 200px;" />
-          <p style="color: #666; font-size: 14px; margin-top: 10px;">Scan this QR code to access your site directly</p>
+          <p style="color: #666; font-size: 14px; margin-top: 10px;">Escaneie este QR code para acessar seu site diretamente</p>
         </div>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
-          <p style="color: #333; font-size: 14px; margin: 0;">Your site URL:</p>
-          <a href="${siteUrl}" style="color: #0ea5e9; font-size: 16px; word-break: break-all; text-decoration: none;">${siteUrl}</a>
+          <p style="color: #333; font-size: 14px; margin: 0;">URL do seu site:</p>
+          <a href="${siteUrl}" style="color: #f05252; font-size: 16px; word-break: break-all; text-decoration: none;">${siteUrl}</a>
         </div>
         
         <p style="color: #333; font-size: 16px; line-height: 1.6;">
-          Simply share this link or QR code with the special person in your life to surprise them with your beautiful message!
+          Compartilhe este link ou QR code com a pessoa especial em sua vida para surpreendê-la com sua bela mensagem!
         </p>
       </div>
       
       <div style="text-align: center; margin-top: 30px; color: #777; font-size: 14px;">
-        <p>© ${new Date().getFullYear()} BirthdayLove.site. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} BirthdayLove.site. Todos os direitos reservados.</p>
       </div>
     </div>
   `;
@@ -64,7 +64,7 @@ export async function sendSiteEmail(email, site) {
     await transporter.sendMail({
       from: `"BirthdayLove" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Your Special Site is Ready! 🎉',
+      subject: 'Seu Site Especial está Pronto! 🎉',
       html: htmlContent,
       attachments: [{
         filename: 'qrcode.png',

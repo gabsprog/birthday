@@ -100,22 +100,22 @@ export async function POST(request) {
     // Create a payment intent with Stripe
     const amount = 4; // $4.00 USD
     const metadata = {
-      siteId: site._id.toString(),
-      slug,
-      customerEmail: data.customerEmail,
+        siteId: site._id.toString(),
+        slug: site.slug,
+        customerEmail: data.customerEmail,
     };
-    
+
     const { clientSecret, id: paymentIntentId } = await createPaymentIntent(amount, metadata);
-    
+
     // Update the site with the payment intent ID
     site.paymentIntentId = paymentIntentId;
     await site.save();
-    
+
     return NextResponse.json({
-      success: true,
-      clientSecret,
-      siteId: site._id.toString(),
-      slug,
+        success: true,
+        clientSecret,
+        siteId: site._id.toString(),
+        slug: site.slug,
     });
     
   } catch (error) {
