@@ -1,5 +1,5 @@
 // src/lib/utils.js
-// Fixed version with proper exports
+// Fixed version with proper exports and optimized string handling
 
 import { v4 as uuidv4 } from 'uuid';
 import CryptoJS from 'crypto-js';
@@ -43,9 +43,17 @@ export function validateYoutubeUrl(url) {
 export function formatDate(date) {
   if (!date) return '';
   
-  const d = new Date(date);
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return d.toLocaleDateString('en-US', options);
+  try {
+    const d = new Date(date);
+    // Verificar se a data é válida
+    if (isNaN(d.getTime())) return '';
+    
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return d.toLocaleDateString('en-US', options);
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return '';
+  }
 }
 
 /**
@@ -56,20 +64,28 @@ export function formatDate(date) {
 export function getTimeDifference(fromDate) {
   if (!fromDate) return null;
   
-  const start = new Date(fromDate);
-  const now = new Date();
-  
-  const diffTime = Math.abs(now - start);
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
-  
-  return {
-    days: diffDays % 30,
-    months: diffMonths % 12,
-    years: diffYears,
-    totalDays: diffDays
-  };
+  try {
+    const start = new Date(fromDate);
+    // Verificar se a data é válida
+    if (isNaN(start.getTime())) return null;
+    
+    const now = new Date();
+    
+    const diffTime = Math.abs(now - start);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = Math.floor(diffDays / 30);
+    const diffYears = Math.floor(diffDays / 365);
+    
+    return {
+      days: diffDays % 30,
+      months: diffMonths % 12,
+      years: diffYears,
+      totalDays: diffDays
+    };
+  } catch (e) {
+    console.error('Error calculating time difference:', e);
+    return null;
+  }
 }
 
 /**
@@ -78,7 +94,13 @@ export function getTimeDifference(fromDate) {
  * @returns {string} Hashed string
  */
 export function hashString(str) {
-  return CryptoJS.SHA256(str).toString(CryptoJS.enc.Hex);
+  if (!str || typeof str !== 'string') return '';
+  try {
+    return CryptoJS.SHA256(str).toString(CryptoJS.enc.Hex);
+  } catch (e) {
+    console.error('Error hashing string:', e);
+    return '';
+  }
 }
 
 /**
@@ -87,6 +109,7 @@ export function hashString(str) {
  * @returns {boolean} Whether the email is valid
  */
 export function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
   const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return re.test(String(email).toLowerCase());
 }
@@ -97,6 +120,13 @@ export function isValidEmail(email) {
  * @returns {Object} Validation result with isValid flag and error message if invalid
  */
 export function validateImage(file) {
+  if (!file) {
+    return {
+      isValid: false,
+      error: 'No file provided'
+    };
+  }
+  
   // Check file type
   const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   if (!validTypes.includes(file.type)) {

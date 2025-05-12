@@ -8,7 +8,7 @@ const Footer = () => {
   return (
     <footer className="bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo and About */}
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="inline-block mb-4">
@@ -70,37 +70,6 @@ const Footer = () => {
               </li>
               <li>
                 <Link 
-                  href="/templates" 
-                  className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
-                >
-                  Templates
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/contact" 
-                  className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
-                >
-                  Contact
-                </Link>
-              </li>
-            </ul>
-          </div>
-          
-          {/* Legal */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Legal</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link 
-                  href="/privacy-policy" 
-                  className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link 
                   href="/terms-of-service" 
                   className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
                 >
@@ -108,12 +77,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link 
-                  href="/refund-policy" 
+                <a 
+                  href="mailto:birthdayloveenterprise@gmail.com" 
                   className="text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
                 >
-                  Refund Policy
-                </Link>
+                  Contact
+                </a>
               </li>
             </ul>
           </div>

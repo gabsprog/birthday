@@ -319,14 +319,18 @@ const BirthdayTemplate = ({
     }
     
     draw();
+
+    const timer = setTimeout(() => {
+      setShowConfetti(false);
+    }, 3000);    
     
     // Cleanup
     return () => {
-      if (confettiAnimationRef.current) {
-        cancelAnimationFrame(confettiAnimationRef.current);
-      }
-    };
-  }, [showConfetti, mode]);
+        if (confettiAnimationRef.current) {
+          cancelAnimationFrame(confettiAnimationRef.current);
+        }
+      };
+    }, [showConfetti, mode]);
   
   // Handle manual navigation for image carousel
   const goToNextImage = () => {
@@ -498,11 +502,12 @@ const BirthdayTemplate = ({
           <div className="max-w-3xl mx-auto space-y-8">
             {/* Dynamic Cards from customTexts.aboutCards */}
             {texts.aboutCards && texts.aboutCards.map((card, index) => (
-              index < images.length ? (
+              index === 0 ? (
+                // Primeiro card com imagem
                 <div key={index} className="bg-white dark:bg-gray-700 rounded-xl overflow-hidden shadow-xl transform transition-all hover:scale-[1.01] opacity-0 animate-fadeIn" style={{animationDelay: `${0.1 * (index + 1)}s`, animationFillMode: 'forwards'}}>
                   <div className="relative">
                     <img 
-                      src={images[index]} 
+                      src={images[0] || '/images/templates/placeholder.jpg'} 
                       alt={`Special Moment ${index + 1}`} 
                       className="w-full h-96 object-cover" 
                     />
@@ -516,6 +521,7 @@ const BirthdayTemplate = ({
                   </div>
                 </div>
               ) : (
+                // Outros cards sem imagem
                 <div key={index} className="bg-white dark:bg-gray-700 rounded-xl overflow-hidden shadow-xl transform transition-all hover:scale-[1.01] opacity-0 animate-fadeIn" style={{animationDelay: `${0.1 * (index + 1)}s`, animationFillMode: 'forwards'}}>
                   <div className="p-6">
                     <h3 className="text-xl font-bold mb-3 text-pink-600 dark:text-pink-400">{card.title}</h3>
@@ -560,37 +566,38 @@ const BirthdayTemplate = ({
           </h2>
           
           <div className="max-w-3xl mx-auto">
-            {images.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {images.map((image, index) => (
-                  <div 
-                    key={index}
-                    className={`group overflow-hidden rounded-lg shadow-lg ${index === 0 ? 'col-span-2 row-span-2 md:col-span-2 md:row-span-2' : ''} opacity-0 animate-fadeIn`} 
-                    style={{
-                      animationDelay: `${0.1 * index}s`,
-                      animationFillMode: 'forwards'
-                    }}
-                  >
-                    <div className="relative h-full w-full overflow-hidden">
-                      <img 
-                        src={image} 
-                        alt={`Memory ${index + 1}`} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                        <p className="text-white p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                          Special Memory #{index + 1}
-                        </p>
-                      </div>
+          {images.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {/* Mostra apenas as imagens a partir da segunda (índice 1) até o final para a galeria */}
+              {images.slice(1).map((image, index) => (
+                <div 
+                  key={index}
+                  className={`group overflow-hidden rounded-lg shadow-lg ${index === 0 ? 'col-span-2 row-span-2 md:col-span-2 md:row-span-2' : ''} opacity-0 animate-fadeIn`} 
+                  style={{
+                    animationDelay: `${0.1 * index}s`,
+                    animationFillMode: 'forwards'
+                  }}
+                >
+                  <div className="relative h-full w-full overflow-hidden">
+                    <img 
+                      src={image} 
+                      alt={`Memory ${index + 1}`} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
+                      <p className="text-white p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        Special Memory #{index + 1}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 dark:text-gray-400">
-                <p>Add images to create a beautiful memory gallery</p>
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <p>Add images to create a beautiful memory gallery</p>
+            </div>
+          )}
           </div>
         </section>
 

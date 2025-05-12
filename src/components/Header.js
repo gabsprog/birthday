@@ -52,12 +52,12 @@ const Header = () => {
           >
             Create
           </Link>
-          <Link
-            href="/contact"
+          <a
+            href="mailto:birthdayloveenterprise@gmail.com"
             className="text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors"
           >
             Contact
-          </Link>
+          </a>
           <Link
             href="/create"
             className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
@@ -124,13 +124,13 @@ const Header = () => {
             >
               Create
             </Link>
-            <Link
-              href="/contact"
+            <a
+              href="mailto:birthdayloveenterprise@gmail.com"
               className="text-gray-700 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-400 font-medium py-2 transition-colors"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Contact
-            </Link>
+            </a>
             <Link
               href="/create"
               className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-4 py-2 rounded-lg transition-colors text-center"

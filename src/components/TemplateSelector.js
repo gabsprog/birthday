@@ -35,8 +35,8 @@ const TemplateSelector = ({ selectedTemplate, onSelectTemplate }) => {
             className={`
               rounded-lg overflow-hidden border-2 cursor-pointer transition-all
               ${selectedTemplate === template.id
-                ? 'border-primary-500 ring-2 ring-primary-300 shadow-lg'
-                : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                ? 'border-gray-400 shadow-lg transform scale-[1.02]' // Modificado aqui: substituiu a borda vermelha
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               }
             `}
             onClick={() => onSelectTemplate(template.id)}
@@ -48,10 +48,10 @@ const TemplateSelector = ({ selectedTemplate, onSelectTemplate }) => {
                 className="w-full h-full object-cover"
               />
               
-              {/* Selected overlay */}
+              {/* Selected overlay - modificado: ícone mais sutil */}
               {selectedTemplate === template.id && (
-                <div className="absolute top-2 right-2 bg-primary-500 rounded-full p-1 shadow">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1 shadow">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-700" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
