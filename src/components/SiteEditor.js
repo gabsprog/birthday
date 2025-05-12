@@ -234,7 +234,7 @@ const SiteEditor = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate form
+    // Validar formulário
     const errors = validateForm();
     
     if (Object.keys(errors).length > 0) {
@@ -245,58 +245,83 @@ const SiteEditor = () => {
     setIsLoading(true);
     
     try {
-      // Add console logging for debugging
-      console.log('Submitting form data:', {
+      // Adicionar log para depuração
+      console.log('Iniciando processo de criação do site...');
+      console.log('Dados do formulário:', {
         templateType: formData.templateType,
         title: formData.title,
         customerEmail: formData.customerEmail,
-        // Don't log full message for privacy and console clarity
+        // Não logar a mensagem completa por privacidade
       });
       
-      // Create the site
-      const response = await axios.post('/api/create-site', formData, {
-        // Add timeout to prevent hanging requests
-        timeout: 15000,
-        // Add additional debugging headers
+      // Criar o site
+      console.log('Enviando requisição para /api/create-site...');
+      const createSiteResponse = await axios.post('/api/create-site', formData, {
+        timeout: 30000, // Aumentar timeout para 30 segundos
         headers: {
           'Content-Type': 'application/json',
         }
       });
       
-      console.log('Response received:', response.data);
+      console.log('Resposta recebida de create-site:', createSiteResponse.data);
       
-      // Redirect to payment
-      if (response.data.success && response.data.clientSecret) {
-        router.push(`/payment?client_secret=${response.data.clientSecret}&site_id=${response.data.siteId}`);
+      if (createSiteResponse.data.success) {
+        const siteId = createSiteResponse.data.siteId;
+        
+        // Criar a sessão de checkout
+        console.log('Criando sessão de checkout para o site:', siteId);
+        const checkoutResponse = await axios.post('/api/create-checkout', {
+          siteId: siteId
+        });
+        
+        console.log('Resposta de checkout:', checkoutResponse.data);
+        
+        if (checkoutResponse.data.success) {
+          // Se já estiver pago, redirecionar para a página de sucesso
+          if (checkoutResponse.data.paid) {
+            router.push(`/success?site_id=${siteId}`);
+            return;
+          }
+          
+          // Redirecionar para a página de checkout do Stripe
+          console.log('Redirecionando para:', checkoutResponse.data.url);
+          window.location.href = checkoutResponse.data.url;
+        } else {
+          console.error('Erro na resposta do checkout:', checkoutResponse.data);
+          alert('Erro ao criar a sessão de pagamento. Por favor, tente novamente.');
+        }
       } else {
-        alert('Something went wrong. Response did not contain expected fields: ' + JSON.stringify(response.data));
+        console.error('Erro na resposta de criação do site:', createSiteResponse.data);
+        alert('Erro ao criar o site. Por favor, tente novamente.');
       }
     } catch (error) {
-      console.error('Error creating site:', error);
+      console.error('Erro durante o processo:', error);
       
-      // Improved error handling with more context
-      let errorMessage = 'Failed to create your site. Please try again.';
+      // Tratamento de erro aprimorado
+      let errorMessage = 'Falha ao criar seu site. Por favor, tente novamente.';
       
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.error('Error response data:', error.response.data);
-        console.error('Error response status:', error.response.status);
+        // O servidor respondeu com um status de erro
+        console.error('Erro do servidor:', {
+          status: error.response.status,
+          data: error.response.data
+        });
         
-        errorMessage = `Server error (${error.response.status}): ${
-          error.response.data.error || 'Unknown error'
+        errorMessage = `Erro do servidor (${error.response.status}): ${
+          error.response.data?.error || 'Erro desconhecido'
         }`;
       } else if (error.request) {
-        // The request was made but no response was received
-        console.error('No response received:', error.request);
-        errorMessage = 'No response from server. Please check your internet connection and try again.';
+        // A requisição foi feita mas não houve resposta
+        console.error('Sem resposta do servidor. Requisição:', error.request);
+        errorMessage = 'Sem resposta do servidor. A requisição expirou ou o servidor está inacessível.';
       } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Error message:', error.message);
-        errorMessage = `Error: ${error.message}`;
+        // Erro na configuração da requisição
+        console.error('Erro na configuração da requisição:', error.message);
+        errorMessage = `Erro: ${error.message}`;
       }
       
-      alert(errorMessage);
+      // Mostrar alerta com detalhes
+      alert(`${errorMessage}\n\nVerifique o console para mais detalhes ou tente novamente mais tarde.`);
     } finally {
       setIsLoading(false);
     }

@@ -8,10 +8,14 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Button from '@/components/ui/Button';
 
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe with proper error handling
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  .catch(error => {
+    console.error('Error loading Stripe:', error);
+    return null;
+  });
 
-// Checkout Form Component
+// Checkout Form Component - Using Stripe Elements properly
 function CheckoutForm({ clientSecret, siteId }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -24,17 +28,16 @@ function CheckoutForm({ clientSecret, siteId }) {
     e.preventDefault();
     
     if (!stripe || !elements) {
-      // Stripe.js has not yet loaded.
-      // Make sure to disable form submission until Stripe.js has loaded.
+      // Stripe.js has not yet loaded
       return;
     }
     
     setIsLoading(true);
+    console.log('Processing payment...');
     
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        // Make sure to change this to your payment completion page
         return_url: `${window.location.origin}/success?site_id=${siteId}`,
       },
     });
@@ -43,8 +46,8 @@ function CheckoutForm({ clientSecret, siteId }) {
     // confirming the payment. Otherwise, your customer will be redirected to
     // your `return_url`.
     if (error) {
-      setErrorMessage(error.message || 'An unexpected error occurred.');
       console.error('Payment error:', error);
+      setErrorMessage(error.message || 'An unexpected error occurred.');
     }
     
     setIsLoading(false);
@@ -52,6 +55,7 @@ function CheckoutForm({ clientSecret, siteId }) {
   
   return (
     <form onSubmit={handleSubmit} className="mt-6">
+      {/* This is the official Stripe Elements component */}
       <PaymentElement />
       
       {errorMessage && (
@@ -85,10 +89,15 @@ export default function PaymentPage() {
   useEffect(() => {
     console.log('Payment page loaded with params:', { 
       clientSecret: clientSecret ? `${clientSecret.substring(0, 10)}...` : null,
-      siteId 
+      siteId,
+      stripeKeyAvailable: Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
     });
     
     if (!clientSecret || !siteId) {
+      console.error('Missing required parameters:', {
+        hasClientSecret: Boolean(clientSecret),
+        hasSiteId: Boolean(siteId)
+      });
       setError('Missing payment information. Please try creating your gift again.');
       setIsLoading(false);
     } else {
@@ -100,7 +109,8 @@ export default function PaymentPage() {
     router.push('/create');
   };
   
-  const stripeOptions = {
+  // Stripe Elements configuration
+  const stripeOptions = clientSecret ? {
     clientSecret,
     appearance: {
       theme: 'stripe',
@@ -109,12 +119,11 @@ export default function PaymentPage() {
         colorBackground: '#ffffff',
         colorText: '#30313d',
         colorDanger: '#df1b41',
-        fontFamily: 'Poppins, system-ui, sans-serif',
-        spacingUnit: '4px',
+        fontFamily: 'system-ui, sans-serif',
         borderRadius: '8px',
       },
     },
-  };
+  } : null;
   
   return (
     <>
@@ -147,7 +156,7 @@ export default function PaymentPage() {
             ) : (
               <>
                 {/* Stripe Elements */}
-                {clientSecret && (
+                {clientSecret && stripeOptions && (
                   <Elements stripe={stripePromise} options={stripeOptions}>
                     <CheckoutForm clientSecret={clientSecret} siteId={siteId} />
                   </Elements>

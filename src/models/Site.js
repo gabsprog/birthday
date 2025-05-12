@@ -269,6 +269,10 @@ const SiteSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  checkoutSessionId: {
+    type: String,
+    required: false,
+  },
   paymentIntentId: {
     type: String,
     required: false,
