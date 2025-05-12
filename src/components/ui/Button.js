@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 
 const Button = ({ 
   children, 
@@ -12,7 +13,8 @@ const Button = ({
   className = '',
   fullWidth = false,
   isLoading = false,
-  icon = null
+  icon = null,
+  href = null
 }) => {
   // Define base classes
   const baseClasses = "font-medium rounded-lg transition-colors duration-200 flex items-center justify-center";
@@ -57,19 +59,38 @@ const Button = ({
     </svg>
   );
   
+  // Button classes
+  const buttonClasses = `
+    ${baseClasses}
+    ${sizeClasses[size]}
+    ${variantClasses[variant]}
+    ${fullWidth ? 'w-full' : ''}
+    ${disabled || isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}
+    ${className}
+  `;
+  
+  // If href is provided, render as Link
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={buttonClasses}
+        onClick={onClick}
+      >
+        {isLoading && loadingSpinner}
+        {icon && !isLoading && <span className={`${children ? 'mr-2' : ''}`}>{icon}</span>}
+        {children}
+      </Link>
+    );
+  }
+  
+  // Otherwise render as button
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled || isLoading}
-      className={`
-        ${baseClasses}
-        ${sizeClasses[size]}
-        ${variantClasses[variant]}
-        ${fullWidth ? 'w-full' : ''}
-        ${disabled || isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}
-        ${className}
-      `}
+      className={buttonClasses}
     >
       {isLoading && loadingSpinner}
       {icon && !isLoading && <span className={`${children ? 'mr-2' : ''}`}>{icon}</span>}

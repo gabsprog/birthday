@@ -64,13 +64,13 @@ export default async function SitePage({ params }) {
       );
     }
     
-    // Render the appropriate template based on the site's template type
+    // Prepare template props
     const templateProps = {
       title: site.title,
       message: site.message,
       specialDate: site.specialDate,
       youtubeLink: site.youtubeLink,
-      images: site.images,
+      images: site.images || [],
       mode: 'view',
     };
     
@@ -83,8 +83,8 @@ export default async function SitePage({ params }) {
       templateProps.customTexts = site.declarationTexts || {};
     }
     
+    // Choose the appropriate template component
     let TemplateComponent;
-    
     switch (site.templateType) {
       case 'birthday':
         TemplateComponent = BirthdayTemplate;
@@ -99,6 +99,7 @@ export default async function SitePage({ params }) {
         TemplateComponent = BirthdayTemplate;
     }
     
+    // Render the template component
     return <TemplateComponent {...templateProps} />;
     
   } catch (error) {
