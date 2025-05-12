@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 // Create schemas for the customized text objects to provide structure to the data
 const FavoriteSchema = new mongoose.Schema({
@@ -216,6 +217,21 @@ const SiteSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
+  // Add default UUIDs for both uniqueHash and editHash
+  uniqueHash: {
+    type: String,
+    default: function() {
+      return uuidv4(); // Generate a new UUID for uniqueHash
+    },
+    unique: true
+  },
+  editHash: {
+    type: String,
+    default: function() {
+      return uuidv4(); // Generate a new UUID for editHash
+    },
+    unique: true
+  },
   templateType: {
     type: String,
     enum: ['birthday', 'anniversary', 'declaration'],
@@ -286,6 +302,17 @@ const SiteSchema = new mongoose.Schema({
     required: false,
     default: () => ({})
   }
+});
+
+// Add a pre-save hook to ensure uniqueHash and editHash are always generated
+SiteSchema.pre('save', function(next) {
+  if (!this.uniqueHash) {
+    this.uniqueHash = uuidv4();
+  }
+  if (!this.editHash) {
+    this.editHash = uuidv4();
+  }
+  next();
 });
 
 // Use the existing model if it exists, otherwise create a new one

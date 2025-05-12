@@ -230,6 +230,7 @@ const SiteEditor = () => {
   };
   
   // Handle form submission
+  // Locate this function in src/components/SiteEditor.js and replace it with this version
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -244,18 +245,58 @@ const SiteEditor = () => {
     setIsLoading(true);
     
     try {
+      // Add console logging for debugging
+      console.log('Submitting form data:', {
+        templateType: formData.templateType,
+        title: formData.title,
+        customerEmail: formData.customerEmail,
+        // Don't log full message for privacy and console clarity
+      });
+      
       // Create the site
-      const response = await axios.post('/api/create-site', formData);
+      const response = await axios.post('/api/create-site', formData, {
+        // Add timeout to prevent hanging requests
+        timeout: 15000,
+        // Add additional debugging headers
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      console.log('Response received:', response.data);
       
       // Redirect to payment
       if (response.data.success && response.data.clientSecret) {
         router.push(`/payment?client_secret=${response.data.clientSecret}&site_id=${response.data.siteId}`);
       } else {
-        alert('Something went wrong. Please try again.');
+        alert('Something went wrong. Response did not contain expected fields: ' + JSON.stringify(response.data));
       }
     } catch (error) {
       console.error('Error creating site:', error);
-      alert('Failed to create your site. Please try again.');
+      
+      // Improved error handling with more context
+      let errorMessage = 'Failed to create your site. Please try again.';
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        
+        errorMessage = `Server error (${error.response.status}): ${
+          error.response.data.error || 'Unknown error'
+        }`;
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('No response received:', error.request);
+        errorMessage = 'No response from server. Please check your internet connection and try again.';
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }

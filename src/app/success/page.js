@@ -17,6 +17,8 @@ export default function SuccessPage() {
   const siteId = searchParams.get('site_id');
   
   useEffect(() => {
+    console.log('Success page loaded with site_id:', siteId);
+    
     if (!siteId) {
       setError('Missing site information. Your payment may have been processed, but we could not locate your site.');
       setIsLoading(false);
@@ -25,9 +27,31 @@ export default function SuccessPage() {
     
     const fetchSite = async () => {
       try {
+        // For development testing without a real API
+        if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+          console.log('DEV MODE: Simulating site fetch');
+          // Create mock site data for testing
+          const mockSite = {
+            slug: `test-site-${Math.random().toString(36).substring(2, 7)}`,
+            title: 'Test Site',
+            customerEmail: 'test@example.com',
+            paid: true
+          };
+          
+          // Simulate loading delay
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          setSite(mockSite);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Real API call for production
+        console.log('Fetching site data...');
         const response = await axios.get(`/api/site/${siteId}`);
         
         if (response.data.success) {
+          console.log('Site data received:', response.data);
           setSite(response.data.site);
         } else {
           throw new Error('Failed to fetch site details');
@@ -43,7 +67,7 @@ export default function SuccessPage() {
     // Add a small delay to allow the webhook to process the payment
     const timer = setTimeout(() => {
       fetchSite();
-    }, 3000);
+    }, 2000);
     
     return () => clearTimeout(timer);
   }, [siteId]);
@@ -120,7 +144,10 @@ export default function SuccessPage() {
                     </div>
                     <div className="mt-4 flex gap-3 justify-center">
                       <Button
-                        onClick={() => navigator.clipboard.writeText(siteUrl)}
+                        onClick={() => {
+                          navigator.clipboard.writeText(siteUrl);
+                          alert('Link copied to clipboard!');
+                        }}
                         variant="outline"
                         size="sm"
                       >
@@ -145,7 +172,7 @@ export default function SuccessPage() {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
-                      We've sent an email to {site.customerEmail} with the site link and QR code.
+                      We've sent an email to {site?.customerEmail || 'your email address'} with the site link and QR code.
                     </li>
                     <li className="flex items-start">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">

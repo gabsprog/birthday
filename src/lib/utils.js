@@ -1,15 +1,23 @@
-'use client';
+// src/lib/utils.js
+// Fixed version with proper exports
 
 import { v4 as uuidv4 } from 'uuid';
 import CryptoJS from 'crypto-js';
 
-// Generate a URL-friendly slug
+/**
+ * Generate a URL-friendly slug
+ * @returns {string} A unique slug for URLs
+ */
 export function generateSlug() {
   const uuid = uuidv4();
   return uuid.substring(0, 8);
 }
 
-// Validate YouTube URL and extract video ID
+/**
+ * Validate YouTube URL and extract video ID
+ * @param {string} url - YouTube URL to validate
+ * @returns {Object} Validation result with isValid flag and videoId if valid
+ */
 export function validateYoutubeUrl(url) {
   if (!url) return { isValid: false };
   
@@ -27,7 +35,11 @@ export function validateYoutubeUrl(url) {
   return { isValid: false };
 }
 
-// Format date for display
+/**
+ * Format date for display
+ * @param {string|Date} date - Date to format
+ * @returns {string} Formatted date string
+ */
 export function formatDate(date) {
   if (!date) return '';
   
@@ -36,7 +48,11 @@ export function formatDate(date) {
   return d.toLocaleDateString('en-US', options);
 }
 
-// Calculate time difference between dates
+/**
+ * Calculate time difference between dates
+ * @param {string|Date} fromDate - Starting date
+ * @returns {Object|null} Time difference object or null if invalid date
+ */
 export function getTimeDifference(fromDate) {
   if (!fromDate) return null;
   
@@ -56,18 +72,30 @@ export function getTimeDifference(fromDate) {
   };
 }
 
-// Hash a string using SHA-256
+/**
+ * Hash a string using SHA-256
+ * @param {string} str - String to hash
+ * @returns {string} Hashed string
+ */
 export function hashString(str) {
   return CryptoJS.SHA256(str).toString(CryptoJS.enc.Hex);
 }
 
-// Validate email format
+/**
+ * Validate email format
+ * @param {string} email - Email address to validate
+ * @returns {boolean} Whether the email is valid
+ */
 export function isValidEmail(email) {
   const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return re.test(String(email).toLowerCase());
 }
 
-// Validate image file (type and size)
+/**
+ * Validate image file (type and size)
+ * @param {File} file - File object to validate
+ * @returns {Object} Validation result with isValid flag and error message if invalid
+ */
 export function validateImage(file) {
   // Check file type
   const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];

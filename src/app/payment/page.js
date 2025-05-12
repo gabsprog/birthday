@@ -3,13 +3,75 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Button from '@/components/ui/Button';
 
-// Load Stripe
+// Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
+// Checkout Form Component
+function CheckoutForm({ clientSecret, siteId }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const router = useRouter();
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!stripe || !elements) {
+      // Stripe.js has not yet loaded.
+      // Make sure to disable form submission until Stripe.js has loaded.
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        // Make sure to change this to your payment completion page
+        return_url: `${window.location.origin}/success?site_id=${siteId}`,
+      },
+    });
+    
+    // This point will only be reached if there is an immediate error when
+    // confirming the payment. Otherwise, your customer will be redirected to
+    // your `return_url`.
+    if (error) {
+      setErrorMessage(error.message || 'An unexpected error occurred.');
+      console.error('Payment error:', error);
+    }
+    
+    setIsLoading(false);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit} className="mt-6">
+      <PaymentElement />
+      
+      {errorMessage && (
+        <div className="bg-red-50 text-red-600 p-3 rounded-md mt-4">
+          {errorMessage}
+        </div>
+      )}
+      
+      <button
+        type="submit"
+        disabled={!stripe || isLoading}
+        className="w-full mt-6 bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 rounded-lg shadow-md transition-colors disabled:bg-gray-400"
+      >
+        {isLoading ? 'Processing...' : 'Pay $4.00'}
+      </button>
+    </form>
+  );
+}
+
+// Main Payment Page
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,60 +81,39 @@ export default function PaymentPage() {
   const clientSecret = searchParams.get('client_secret');
   const siteId = searchParams.get('site_id');
   
+  // Log params for debugging
   useEffect(() => {
+    console.log('Payment page loaded with params:', { 
+      clientSecret: clientSecret ? `${clientSecret.substring(0, 10)}...` : null,
+      siteId 
+    });
+    
     if (!clientSecret || !siteId) {
       setError('Missing payment information. Please try creating your gift again.');
       setIsLoading(false);
-      return;
+    } else {
+      setIsLoading(false);
     }
-    
-    const initializePayment = async () => {
-      try {
-        const stripe = await stripePromise;
-        
-        if (!stripe) {
-          throw new Error('Failed to load payment provider');
-        }
-        
-        // Initialize Stripe Elements
-        const { error } = await stripe.confirmPayment({
-          clientSecret,
-          confirmParams: {
-            return_url: `${window.location.origin}/success?site_id=${siteId}`,
-          },
-          elements: {
-            appearance: {
-              theme: 'stripe',
-              variables: {
-                colorPrimary: '#f05252',
-                colorBackground: '#ffffff',
-                colorText: '#30313d',
-                colorDanger: '#df1b41',
-                fontFamily: 'Poppins, system-ui, sans-serif',
-                spacingUnit: '4px',
-                borderRadius: '8px',
-              },
-            },
-          },
-        });
-        
-        if (error) {
-          // Payment failed, display error
-          setError(error.message || 'Payment failed. Please try again.');
-        }
-      } catch (error) {
-        console.error('Payment initialization error:', error);
-        setError('Something went wrong. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    initializePayment();
   }, [clientSecret, siteId]);
   
   const handleTryAgain = () => {
     router.push('/create');
+  };
+  
+  const stripeOptions = {
+    clientSecret,
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#f05252',
+        colorBackground: '#ffffff',
+        colorText: '#30313d',
+        colorDanger: '#df1b41',
+        fontFamily: 'Poppins, system-ui, sans-serif',
+        spacingUnit: '4px',
+        borderRadius: '8px',
+      },
+    },
   };
   
   return (
@@ -104,12 +145,14 @@ export default function PaymentPage() {
                 </Button>
               </div>
             ) : (
-              <div className="text-center py-10">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Processing your payment...
-                </p>
-              </div>
+              <>
+                {/* Stripe Elements */}
+                {clientSecret && (
+                  <Elements stripe={stripePromise} options={stripeOptions}>
+                    <CheckoutForm clientSecret={clientSecret} siteId={siteId} />
+                  </Elements>
+                )}
+              </>
             )}
             
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
