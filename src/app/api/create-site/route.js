@@ -38,10 +38,10 @@ async function getMongoConnection() {
       serverSelectionTimeoutMS: 10000,
       family: 4
     };
-    if (process.env.NODE_ENV === 'production') {
-      options.keepAlive = true;
-      options.keepAliveInitialDelay = 300000;
-    }
+    // if (process.env.NODE_ENV === 'production') {
+    //   options.keepAlive = true;
+    //   options.keepAliveInitialDelay = 300000;
+    // }
 
     await mongoose.connect(MONGODB_URI, options);
     return mongoose.connection;
