@@ -31,9 +31,9 @@ const nextConfig = {
     
     return config;
   },
-  // Add Node.js flags to increase call stack size
+  // Remove the invalid nodeOptions in experimental
   experimental: {
-    nodeOptions: ['--stack-size=4000'],
+    // Configure other valid experimental features here if needed
   },
 };
 

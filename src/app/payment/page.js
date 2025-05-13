@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -75,8 +75,8 @@ function CheckoutForm({ clientSecret, siteId }) {
   );
 }
 
-// Main Payment Page
-export default function PaymentPage() {
+// Component that requires searchParams - wrapped with client-side logic
+function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
@@ -126,71 +126,87 @@ export default function PaymentPage() {
   } : null;
   
   return (
+    <div className="container mx-auto px-4 max-w-lg">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">
+          Complete Your Payment
+        </h1>
+        
+        {isLoading ? (
+          <div className="text-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">
+              Loading payment form...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-6">
+            <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-lg mb-6">
+              <p>{error}</p>
+            </div>
+            
+            <Button onClick={handleTryAgain}>
+              Try Again
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Stripe Elements */}
+            {clientSecret && stripeOptions && (
+              <Elements stripe={stripePromise} options={stripeOptions}>
+                <CheckoutForm clientSecret={clientSecret} siteId={siteId} />
+              </Elements>
+            )}
+          </>
+        )}
+        
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium mb-4">Payment Summary</h3>
+          <div className="flex justify-between mb-2">
+            <span className="text-gray-600 dark:text-gray-400">Digital Gift Creation</span>
+            <span className="font-medium">$4.00</span>
+          </div>
+          <div className="flex justify-between mb-2">
+            <span className="text-gray-600 dark:text-gray-400">Processing Fee</span>
+            <span className="font-medium">$0.00</span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+            <span className="font-medium">Total</span>
+            <span className="font-bold">$4.00</span>
+          </div>
+        </div>
+        
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p>Your site will be available immediately after payment</p>
+          <p className="mt-2">
+            By proceeding with the payment, you agree to our{' '}
+            <a href="/terms" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
+              Terms of Service
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main Payment Page with Suspense boundary
+export default function PaymentPage() {
+  return (
     <>
       <Header />
       
       <main className="mt-24 mb-16">
-        <div className="container mx-auto px-4 max-w-lg">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-            <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">
-              Complete Your Payment
-            </h1>
-            
-            {isLoading ? (
-              <div className="text-center py-10">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Loading payment form...
-                </p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-6">
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-lg mb-6">
-                  <p>{error}</p>
-                </div>
-                
-                <Button onClick={handleTryAgain}>
-                  Try Again
-                </Button>
-              </div>
-            ) : (
-              <>
-                {/* Stripe Elements */}
-                {clientSecret && stripeOptions && (
-                  <Elements stripe={stripePromise} options={stripeOptions}>
-                    <CheckoutForm clientSecret={clientSecret} siteId={siteId} />
-                  </Elements>
-                )}
-              </>
-            )}
-            
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-medium mb-4">Payment Summary</h3>
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600 dark:text-gray-400">Digital Gift Creation</span>
-                <span className="font-medium">$4.00</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600 dark:text-gray-400">Processing Fee</span>
-                <span className="font-medium">$0.00</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
-                <span className="font-medium">Total</span>
-                <span className="font-bold">$4.00</span>
-              </div>
-            </div>
-            
-            <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-              <p>Your site will be available immediately after payment</p>
-              <p className="mt-2">
-                By proceeding with the payment, you agree to our{' '}
-                <a href="/terms" className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
-                  Terms of Service
-                </a>
-              </p>
+        <Suspense fallback={
+          <div className="container mx-auto px-4 max-w-lg">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mx-auto mb-4"></div>
+              <p>Loading payment information...</p>
             </div>
           </div>
-        </div>
+        }>
+          <PaymentContent />
+        </Suspense>
       </main>
       
       <Footer />
