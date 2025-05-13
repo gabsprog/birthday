@@ -1,7 +1,8 @@
-// src/lib/mongodb.js - Solução completa e robusta
+// Replace your existing mongodb.js file with this one
+
 import mongoose from 'mongoose';
 
-// Informações de estado para gerenciar conexão global 
+// Global connection state
 let globalMongoConnection = {
   conn: null,
   promise: null,
@@ -11,109 +12,101 @@ let globalMongoConnection = {
 };
 
 /**
- * Função avançada para conectar ao MongoDB com alta confiabilidade
- * Inclui gerenciamento completo de conexão, tentativas e manipulação de erros
+ * Connect to MongoDB with reliable error handling
  */
 async function connectToDatabase(options = {}) {
   const MONGODB_URI = process.env.MONGODB_URI;
   
   if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI não está definido nas variáveis de ambiente');
+    throw new Error('MONGODB_URI is not defined in environment variables');
   }
   
   const {
     maxRetries = 3,
     retryDelayMs = 1000,
     forceNewConnection = false,
-    maxConnectionAge = 60000 // 1 minuto
+    maxConnectionAge = 60000 // 1 minute
   } = options;
   
-  // Se já temos uma conexão ativa e não está sendo forçada uma nova conexão
+  // If we already have a valid connection, use it
   if (!forceNewConnection && 
       globalMongoConnection.conn && 
       mongoose.connection.readyState === 1 &&
       globalMongoConnection.lastConnectionTime && 
       (Date.now() - globalMongoConnection.lastConnectionTime < maxConnectionAge)) {
     
-    console.log('Usando conexão MongoDB existente e válida');
+    console.log('Using existing MongoDB connection');
     return globalMongoConnection.conn;
   }
   
-  // Se uma conexão já está em andamento, aguarde-a
+  // If a connection is pending, wait for it
   if (globalMongoConnection.promise && globalMongoConnection.isConnecting) {
-    console.log('Aguardando conexão MongoDB em andamento...');
+    console.log('Waiting for pending MongoDB connection...');
     try {
       await globalMongoConnection.promise;
-      console.log('Conexão pendente concluída com sucesso');
+      console.log('Pending connection completed successfully');
       return globalMongoConnection.conn;
     } catch (error) {
-      console.error('Conexão pendente falhou, tentando nova conexão:', error.message);
-      // Continua para criar uma nova conexão
+      console.error('Pending connection failed, trying again:', error.message);
     }
   }
   
-  // Limpar conexão existente se necessário
+  // Close existing connection if needed
   if (mongoose.connection.readyState !== 0) {
     try {
-      console.log(`Fechando conexão MongoDB anterior (estado: ${mongoose.connection.readyState})`);
+      console.log(`Closing previous MongoDB connection (state: ${mongoose.connection.readyState})`);
       await mongoose.disconnect();
-      console.log('Conexão anterior fechada com sucesso');
+      console.log('Previous connection closed successfully');
     } catch (disconnectError) {
-      console.error('Erro ao fechar conexão anterior:', disconnectError.message);
-      // Continua mesmo que a desconexão falhe
+      console.error('Error closing previous connection:', disconnectError.message);
     }
   }
   
-  // Configurar nova tentativa de conexão
+  // Set up new connection
   globalMongoConnection.isConnecting = true;
   globalMongoConnection.connectionAttempts += 1;
   
+  // IMPORTANT: Only use MongoDB options that are supported
   const mongooseOptions = {
-    bufferCommands: true, // CRÍTICO: permite comandos antes da conexão estar pronta
-    serverSelectionTimeoutMS: 30000, // 30 segundos para selecionar servidor
-    socketTimeoutMS: 45000, // 45 segundos para timeout de socket
-    connectTimeoutMS: 30000, // 30 segundos para timeout de conexão
-    heartbeatFrequencyMS: 30000, // Verificação de heartbeat a cada 30 segundos
-    family: 4, // Forçar IPv4
-    maxPoolSize: 10, // Limitar número de conexões
-    minPoolSize: 1, // Manter ao menos uma conexão
-    autoIndex: false, // Desativar criação automática de índices em produção
-    autoCreate: false, // Desativar criação automática de coleções
-    maxIdleTimeMS: 45000, // Tempo máximo de inatividade
-    retryWrites: true, // Tentar novamente escritas que falham
-    w: 'majority' // Esperar confirmação da maioria dos servidores
+    bufferCommands: true,
+    serverSelectionTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 30000,
+    family: 4,
+    maxPoolSize: 10,
+    minPoolSize: 1
   };
   
-  console.log(`Iniciando nova conexão MongoDB (tentativa ${globalMongoConnection.connectionAttempts})...`);
+  console.log(`Starting new MongoDB connection (attempt ${globalMongoConnection.connectionAttempts})...`);
   
   async function attemptConnection(retriesLeft) {
     try {
-      console.log(`Tentativa de conexão ${maxRetries - retriesLeft + 1}/${maxRetries}`);
+      console.log(`Connection attempt ${maxRetries - retriesLeft + 1}/${maxRetries}`);
       const connection = await mongoose.connect(MONGODB_URI, mongooseOptions);
       
-      // Verificar se a conexão está realmente pronta
+      // Check if connection is ready
       if (mongoose.connection.readyState !== 1) {
-        throw new Error(`Conexão não está no estado pronto. Estado atual: ${mongoose.connection.readyState}`);
+        throw new Error(`Connection not ready. Current state: ${mongoose.connection.readyState}`);
       }
       
-      // Testar a conexão com uma consulta simples
+      // Test connection with a ping
       await mongoose.connection.db.admin().ping();
       
-      console.log('Conexão MongoDB estabelecida e verificada com sucesso!');
+      console.log('MongoDB connection established successfully!');
       globalMongoConnection.conn = connection;
       globalMongoConnection.lastConnectionTime = Date.now();
       
-      // Configurar listeners de eventos para reconexão automática
+      // Set up event listeners
       setupConnectionMonitoring();
       
       return connection;
     } catch (error) {
       if (retriesLeft > 0) {
-        console.log(`Tentativa de conexão falhou: ${error.message}. Tentando novamente em ${retryDelayMs}ms...`);
+        console.log(`Connection failed: ${error.message}. Retrying in ${retryDelayMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, retryDelayMs));
         return attemptConnection(retriesLeft - 1);
       } else {
-        throw new Error(`Falha ao conectar ao MongoDB após ${maxRetries} tentativas: ${error.message}`);
+        throw new Error(`Failed to connect to MongoDB after ${maxRetries} attempts: ${error.message}`);
       }
     }
   }
@@ -123,7 +116,7 @@ async function connectToDatabase(options = {}) {
     const connection = await globalMongoConnection.promise;
     return connection;
   } catch (error) {
-    console.error('Todas as tentativas de conexão falharam:', error.message);
+    console.error('All connection attempts failed:', error.message);
     globalMongoConnection.isConnecting = false;
     globalMongoConnection.promise = null;
     throw error;
@@ -133,34 +126,33 @@ async function connectToDatabase(options = {}) {
 }
 
 /**
- * Configura monitoramento de conexão com eventos para controle de estado
+ * Set up connection monitoring
  */
 function setupConnectionMonitoring() {
-  // Remover listeners existentes para evitar duplicação
+  // Remove existing listeners
   mongoose.connection.removeAllListeners('disconnected');
   mongoose.connection.removeAllListeners('error');
   mongoose.connection.removeAllListeners('connected');
   
-  // Quando desconectado
+  // When disconnected
   mongoose.connection.on('disconnected', () => {
-    console.log('MongoDB desconectado. Reconexão será necessária na próxima operação.');
+    console.log('MongoDB disconnected. Will reconnect on next operation.');
     globalMongoConnection.conn = null;
     globalMongoConnection.promise = null;
   });
   
-  // Quando ocorre erro de conexão
+  // When error occurs
   mongoose.connection.on('error', (err) => {
-    console.error('Erro na conexão MongoDB:', err.message);
-    // Apenas reseta se for um erro grave de conexão
+    console.error('MongoDB connection error:', err.message);
     if (err.name === 'MongoNetworkError' || err.name === 'MongoServerSelectionError') {
       globalMongoConnection.conn = null;
       globalMongoConnection.promise = null;
     }
   });
   
-  // Quando reconectado após falha
+  // When reconnected
   mongoose.connection.on('connected', () => {
-    console.log('MongoDB reconectado após falha prévia');
+    console.log('MongoDB reconnected after previous failure');
     globalMongoConnection.lastConnectionTime = Date.now();
   });
 }
