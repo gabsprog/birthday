@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
+import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
 import { v4 as uuidv4 } from 'uuid'; // Direct import for generateSlug fallback
 import { createPaymentIntent } from '@/lib/stripe';
@@ -8,51 +8,6 @@ import { createPaymentIntent } from '@/lib/stripe';
 function generateSlug() {
   const uuid = uuidv4();
   return uuid.substring(0, 8);
-}
-
-// Improved MongoDB connection with retry logic
-async function connectWithRetry(retries = 5, delay = 500) {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  
-  if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI is not defined in environment variables');
-  }
-  
-  // Check if already connected
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-  
-  let lastError;
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      console.log(`MongoDB connection attempt ${i + 1}/${retries}...`);
-      
-      // Connect with proper options
-      const connection = await mongoose.connect(MONGODB_URI, {
-        bufferCommands: true, // Changed to true to allow buffering commands
-        serverSelectionTimeoutMS: 10000, // Increased timeout
-        connectTimeoutMS: 20000, // Increased timeout
-        socketTimeoutMS: 45000, // Increased socket timeout
-      });
-      
-      console.log('MongoDB connection successful');
-      return connection;
-    } catch (error) {
-      console.error(`MongoDB connection attempt ${i + 1} failed:`, error.message);
-      lastError = error;
-      
-      // Wait before trying again
-      if (i < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-        // Exponential backoff
-        delay *= 2;
-      }
-    }
-  }
-  
-  throw new Error(`Failed to connect to MongoDB after ${retries} attempts: ${lastError.message}`);
 }
 
 export async function POST(request) {
@@ -82,13 +37,18 @@ export async function POST(request) {
       );
     }
     
-    // Connect to the database with retry logic
+    // Connect to the database with robust retry logic
     console.log('Connecting to database...');
     try {
-      await connectWithRetry();
-      console.log('Database connection established');
+      // Use the enhanced connection function with increased reliability settings
+      await connectToDatabase({
+        maxRetries: 5,
+        retryDelayMs: 1500,
+        forceNewConnection: false
+      });
+      console.log('Database connection established and verified');
     } catch (dbError) {
-      console.error('Database connection failed:', dbError);
+      console.error('Database connection failed after multiple attempts:', dbError);
       return NextResponse.json(
         { error: 'Database connection failed: ' + dbError.message },
         { status: 500 }
@@ -97,14 +57,36 @@ export async function POST(request) {
     
     // Generate a unique slug - using the function directly as defined above
     let slug = generateSlug();
-    let existingSite = await Site.findOne({ slug });
+    
+    // Explicitly handle the findOne operation with a try/catch
+    let existingSite = null;
+    try {
+      existingSite = await Site.findOne({ slug }).exec();
+      console.log('Existing site check completed for slug:', slug);
+    } catch (findError) {
+      console.error('Error checking existing site:', findError);
+      return NextResponse.json(
+        { error: 'Error checking site availability: ' + findError.message },
+        { status: 500 }
+      );
+    }
     
     // Ensure slug is unique
     let slugAttempts = 1;
     while (existingSite) {
       console.log(`Slug "${slug}" already exists, generating new one (attempt ${slugAttempts})`);
       slug = generateSlug();
-      existingSite = await Site.findOne({ slug });
+      
+      try {
+        existingSite = await Site.findOne({ slug }).exec();
+      } catch (findError) {
+        console.error(`Error checking existing site on attempt ${slugAttempts}:`, findError);
+        return NextResponse.json(
+          { error: 'Error checking site availability: ' + findError.message },
+          { status: 500 }
+        );
+      }
+      
       slugAttempts++;
       
       if (slugAttempts > 5) {
@@ -181,12 +163,11 @@ export async function POST(request) {
       };
     }
     
-    // Create a new site document
+    // Create a new site document with explicit error handling
     console.log('Creating site document...');
-    const site = new Site(siteData);
-    
-    // Save the site to the database
+    let site = null;
     try {
+      site = new Site(siteData);
       await site.save();
       console.log('Site document saved successfully with ID:', site._id.toString());
     } catch (saveError) {
@@ -200,6 +181,11 @@ export async function POST(request) {
     // Create a payment intent with Stripe
     console.log('Creating Stripe payment intent...');
     try {
+      // Verify Stripe is properly configured
+      if (!process.env.STRIPE_SECRET_KEY) {
+        throw new Error('STRIPE_SECRET_KEY environment variable is not configured');
+      }
+      
       const amount = 4; // $4.00 USD
       const metadata = {
         siteId: site._id.toString(),
@@ -210,10 +196,15 @@ export async function POST(request) {
       const { clientSecret, id: paymentIntentId } = await createPaymentIntent(amount, metadata);
       console.log('Payment intent created with ID:', paymentIntentId);
       
-      // Update the site with the payment intent ID
-      site.paymentIntentId = paymentIntentId;
-      await site.save();
-      console.log('Site document updated with payment intent ID');
+      // Update the site with the payment intent ID - handle this separately
+      try {
+        site.paymentIntentId = paymentIntentId;
+        await site.save();
+        console.log('Site document updated with payment intent ID');
+      } catch (updateError) {
+        console.error('Error updating site with payment intent ID:', updateError);
+        // Non-critical - continue even if this update fails
+      }
       
       return NextResponse.json({
         success: true,
@@ -226,8 +217,11 @@ export async function POST(request) {
       
       // Clean up the site document if payment intent fails
       try {
-        await Site.findByIdAndDelete(site._id);
-        console.log('Cleaned up site document after payment intent failure');
+        if (site?._id) {
+          const deleteResult = await Site.findByIdAndDelete(site._id);
+          console.log('Cleaned up site document after payment intent failure:', 
+                     deleteResult ? 'Success' : 'Not found');
+        }
       } catch (cleanupError) {
         console.error('Failed to clean up site document:', cleanupError);
       }

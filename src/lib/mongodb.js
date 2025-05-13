@@ -1,181 +1,168 @@
-// src/lib/mongodb.js - With improved connection handling
+// src/lib/mongodb.js - Solução completa e robusta
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// Informações de estado para gerenciar conexão global 
+let globalMongoConnection = {
+  conn: null,
+  promise: null,
+  isConnecting: false,
+  connectionAttempts: 0,
+  lastConnectionTime: null
+};
 
-let cached = global.mongoose;
-let mockDb = null;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
-
-async function connectToDatabase() {
-  // If we have a connection, return it
-  if (cached.conn && mongoose.connection.readyState === 1) {
-    console.log('Using existing MongoDB connection');
-    return cached.conn;
-  }
-
-  // If we don't have a valid MongoDB URI, use an in-memory mock
+/**
+ * Função avançada para conectar ao MongoDB com alta confiabilidade
+ * Inclui gerenciamento completo de conexão, tentativas e manipulação de erros
+ */
+async function connectToDatabase(options = {}) {
+  const MONGODB_URI = process.env.MONGODB_URI;
+  
   if (!MONGODB_URI) {
-    console.warn('MONGODB_URI not provided, using in-memory mock database');
-    return setupMockDatabase();
+    throw new Error('MONGODB_URI não está definido nas variáveis de ambiente');
   }
-
-  try {
-    // Reset state if the connection was closed or errored out
-    if (mongoose.connection.readyState === 0 || mongoose.connection.readyState === 3) {
-      cached.promise = null;
-      cached.conn = null;
-      console.log('Previous connection was closed or had error, creating new connection');
-    }
+  
+  const {
+    maxRetries = 3,
+    retryDelayMs = 1000,
+    forceNewConnection = false,
+    maxConnectionAge = 60000 // 1 minuto
+  } = options;
+  
+  // Se já temos uma conexão ativa e não está sendo forçada uma nova conexão
+  if (!forceNewConnection && 
+      globalMongoConnection.conn && 
+      mongoose.connection.readyState === 1 &&
+      globalMongoConnection.lastConnectionTime && 
+      (Date.now() - globalMongoConnection.lastConnectionTime < maxConnectionAge)) {
     
-    // If we don't have a promise yet, create one
-    if (!cached.promise) {
-      const opts = {
-        bufferCommands: true, // Allow buffering commands before connection is established
-        serverSelectionTimeoutMS: 10000, // Increased from 5000ms
-        connectTimeoutMS: 20000, // Increased from 10000ms
-        socketTimeoutMS: 45000, // Add socket timeout
-        family: 4, // Use IPv4, skip trying IPv6
-        maxPoolSize: 10, // Keep up to 10 connections open
-      };
-
-      console.log('Connecting to MongoDB...');
+    console.log('Usando conexão MongoDB existente e válida');
+    return globalMongoConnection.conn;
+  }
+  
+  // Se uma conexão já está em andamento, aguarde-a
+  if (globalMongoConnection.promise && globalMongoConnection.isConnecting) {
+    console.log('Aguardando conexão MongoDB em andamento...');
+    try {
+      await globalMongoConnection.promise;
+      console.log('Conexão pendente concluída com sucesso');
+      return globalMongoConnection.conn;
+    } catch (error) {
+      console.error('Conexão pendente falhou, tentando nova conexão:', error.message);
+      // Continua para criar uma nova conexão
+    }
+  }
+  
+  // Limpar conexão existente se necessário
+  if (mongoose.connection.readyState !== 0) {
+    try {
+      console.log(`Fechando conexão MongoDB anterior (estado: ${mongoose.connection.readyState})`);
+      await mongoose.disconnect();
+      console.log('Conexão anterior fechada com sucesso');
+    } catch (disconnectError) {
+      console.error('Erro ao fechar conexão anterior:', disconnectError.message);
+      // Continua mesmo que a desconexão falhe
+    }
+  }
+  
+  // Configurar nova tentativa de conexão
+  globalMongoConnection.isConnecting = true;
+  globalMongoConnection.connectionAttempts += 1;
+  
+  const mongooseOptions = {
+    bufferCommands: true, // CRÍTICO: permite comandos antes da conexão estar pronta
+    serverSelectionTimeoutMS: 30000, // 30 segundos para selecionar servidor
+    socketTimeoutMS: 45000, // 45 segundos para timeout de socket
+    connectTimeoutMS: 30000, // 30 segundos para timeout de conexão
+    heartbeatFrequencyMS: 30000, // Verificação de heartbeat a cada 30 segundos
+    family: 4, // Forçar IPv4
+    maxPoolSize: 10, // Limitar número de conexões
+    minPoolSize: 1, // Manter ao menos uma conexão
+    autoIndex: false, // Desativar criação automática de índices em produção
+    autoCreate: false, // Desativar criação automática de coleções
+    maxIdleTimeMS: 45000, // Tempo máximo de inatividade
+    retryWrites: true, // Tentar novamente escritas que falham
+    w: 'majority' // Esperar confirmação da maioria dos servidores
+  };
+  
+  console.log(`Iniciando nova conexão MongoDB (tentativa ${globalMongoConnection.connectionAttempts})...`);
+  
+  async function attemptConnection(retriesLeft) {
+    try {
+      console.log(`Tentativa de conexão ${maxRetries - retriesLeft + 1}/${maxRetries}`);
+      const connection = await mongoose.connect(MONGODB_URI, mongooseOptions);
       
-      cached.promise = mongoose
-        .connect(MONGODB_URI, opts)
-        .then((mongoose) => {
-          console.log('MongoDB connected successfully');
-          return mongoose;
-        });
-    } else {
-      console.log('Reusing existing MongoDB connection promise');
-    }
-
-    cached.conn = await cached.promise;
-    
-    // Setup error handlers to catch connection issues
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-      // Reset on errors for the next connection attempt
-      if (err.name === 'MongoNetworkError' || err.name === 'MongoServerSelectionError') {
-        cached.promise = null;
-        cached.conn = null;
+      // Verificar se a conexão está realmente pronta
+      if (mongoose.connection.readyState !== 1) {
+        throw new Error(`Conexão não está no estado pronto. Estado atual: ${mongoose.connection.readyState}`);
       }
-    });
-    
-    mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected, will reconnect on next request');
-      cached.promise = null;
-      cached.conn = null;
-    });
-    
-    return cached.conn;
-  } catch (e) {
-    console.error('Error establishing MongoDB connection:', e.message);
-    cached.promise = null;
-    cached.conn = null;
-    
-    // Fallback to mock database in case of connection failure in production
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('Falling back to in-memory mock database in production');
-      return setupMockDatabase();
+      
+      // Testar a conexão com uma consulta simples
+      await mongoose.connection.db.admin().ping();
+      
+      console.log('Conexão MongoDB estabelecida e verificada com sucesso!');
+      globalMongoConnection.conn = connection;
+      globalMongoConnection.lastConnectionTime = Date.now();
+      
+      // Configurar listeners de eventos para reconexão automática
+      setupConnectionMonitoring();
+      
+      return connection;
+    } catch (error) {
+      if (retriesLeft > 0) {
+        console.log(`Tentativa de conexão falhou: ${error.message}. Tentando novamente em ${retryDelayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        return attemptConnection(retriesLeft - 1);
+      } else {
+        throw new Error(`Falha ao conectar ao MongoDB após ${maxRetries} tentativas: ${error.message}`);
+      }
     }
-    
-    throw e;
+  }
+  
+  try {
+    globalMongoConnection.promise = attemptConnection(maxRetries);
+    const connection = await globalMongoConnection.promise;
+    return connection;
+  } catch (error) {
+    console.error('Todas as tentativas de conexão falharam:', error.message);
+    globalMongoConnection.isConnecting = false;
+    globalMongoConnection.promise = null;
+    throw error;
+  } finally {
+    globalMongoConnection.isConnecting = false;
   }
 }
 
-// Setup an in-memory mock database for development
-function setupMockDatabase() {
-  if (mockDb) {
-    return mockDb;
-  }
+/**
+ * Configura monitoramento de conexão com eventos para controle de estado
+ */
+function setupConnectionMonitoring() {
+  // Remover listeners existentes para evitar duplicação
+  mongoose.connection.removeAllListeners('disconnected');
+  mongoose.connection.removeAllListeners('error');
+  mongoose.connection.removeAllListeners('connected');
   
-  console.log('Setting up mock database for development');
+  // Quando desconectado
+  mongoose.connection.on('disconnected', () => {
+    console.log('MongoDB desconectado. Reconexão será necessária na próxima operação.');
+    globalMongoConnection.conn = null;
+    globalMongoConnection.promise = null;
+  });
   
-  // Simple in-memory storage
-  const inMemoryStorage = {
-    sites: [],
-    models: {},
-    connection: {
-      db: {
-        databaseName: 'mock-db',
-        listCollections: () => ({ 
-          toArray: () => Promise.resolve([{ name: 'sites' }]) 
-        })
-      },
-      host: 'localhost',
-      port: 'N/A',
-      readyState: 1
+  // Quando ocorre erro de conexão
+  mongoose.connection.on('error', (err) => {
+    console.error('Erro na conexão MongoDB:', err.message);
+    // Apenas reseta se for um erro grave de conexão
+    if (err.name === 'MongoNetworkError' || err.name === 'MongoServerSelectionError') {
+      globalMongoConnection.conn = null;
+      globalMongoConnection.promise = null;
     }
-  };
+  });
   
-  // Mock model functions
-  class MockModel {
-    constructor(data) {
-      this._id = 'mock_' + Date.now();
-      Object.assign(this, data);
-    }
-    
-    async save() {
-      // Add or update in our in-memory storage
-      const existingIndex = inMemoryStorage.sites.findIndex(s => s._id === this._id);
-      if (existingIndex >= 0) {
-        inMemoryStorage.sites[existingIndex] = this;
-      } else {
-        inMemoryStorage.sites.push(this);
-      }
-      return this;
-    }
-    
-    static async findOne(query) {
-      return inMemoryStorage.sites.find(site => {
-        // Match all keys in the query
-        return Object.keys(query).every(key => site[key] === query[key]);
-      }) || null;
-    }
-    
-    static async findById(id) {
-      return inMemoryStorage.sites.find(site => site._id === id) || null;
-    }
-    
-    static async findByIdAndDelete(id) {
-      const index = inMemoryStorage.sites.findIndex(site => site._id === id);
-      if (index >= 0) {
-        inMemoryStorage.sites.splice(index, 1);
-        return true;
-      }
-      return false;
-    }
-  }
-  
-  // Mock mongoose
-  mockDb = {
-    ...inMemoryStorage,
-    models: {
-      Site: MockModel
-    },
-    model: (name, schema) => {
-      // Return existing model if it exists
-      if (inMemoryStorage.models[name]) {
-        return inMemoryStorage.models[name];
-      }
-      
-      // Create a new model
-      inMemoryStorage.models[name] = MockModel;
-      return inMemoryStorage.models[name];
-    },
-    Schema: class MockSchema {
-      constructor() {
-        // Just a dummy constructor to make mongoose code work
-      }
-    }
-  };
-  
-  return mockDb;
+  // Quando reconectado após falha
+  mongoose.connection.on('connected', () => {
+    console.log('MongoDB reconectado após falha prévia');
+    globalMongoConnection.lastConnectionTime = Date.now();
+  });
 }
 
 export default connectToDatabase;

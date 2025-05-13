@@ -2,53 +2,8 @@
 
 import { NextResponse } from 'next/server';
 import stripe from '@/lib/stripe';
-import mongoose from 'mongoose';
+import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
-
-// Improved MongoDB connection function with retry logic
-async function connectWithRetry(retries = 5, delay = 500) {
-  const MONGODB_URI = process.env.MONGODB_URI;
-  
-  if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI is not defined in environment variables');
-  }
-  
-  // Check if already connected
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-  
-  let lastError;
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      console.log(`MongoDB connection attempt ${i + 1}/${retries}...`);
-      
-      // Connect with proper options
-      const connection = await mongoose.connect(MONGODB_URI, {
-        bufferCommands: true,
-        serverSelectionTimeoutMS: 10000,
-        connectTimeoutMS: 20000,
-        socketTimeoutMS: 45000,
-      });
-      
-      console.log('MongoDB connection successful');
-      return connection;
-    } catch (error) {
-      console.error(`MongoDB connection attempt ${i + 1} failed:`, error.message);
-      lastError = error;
-      
-      // Wait before trying again
-      if (i < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-        // Exponential backoff
-        delay *= 2;
-      }
-    }
-  }
-  
-  throw new Error(`Failed to connect to MongoDB after ${retries} attempts: ${lastError.message}`);
-}
 
 export async function POST(request) {
   try {
@@ -66,27 +21,46 @@ export async function POST(request) {
       );
     }
     
-    // Connect to the database with retry logic
+    // Conecta ao banco de dados com configuração robusta
     try {
       console.log('Conectando ao banco de dados...');
-      await connectWithRetry();
-      console.log('Database connection established for checkout');
+      await connectToDatabase({
+        maxRetries: 5,
+        retryDelayMs: 1500,
+        forceNewConnection: false
+      });
+      console.log('Conexão com banco de dados estabelecida e verificada');
     } catch (dbError) {
-      console.error('Database connection failed for checkout:', dbError);
+      console.error('Falha na conexão com o banco de dados após múltiplas tentativas:', dbError);
       return NextResponse.json(
-        { error: 'Failed to connect to database: ' + dbError.message },
+        { error: 'Falha na conexão com o banco de dados: ' + dbError.message },
         { status: 500 }
       );
     }
     
-    // Busca o site
-    const site = await Site.findById(siteId);
-    
-    if (!site) {
-      console.error(`Site não encontrado: ${siteId}`);
+    // Busca o site com tratamento explícito de erros
+    let site = null;
+    try {
+      site = await Site.findById(siteId).exec();
+      
+      if (!site) {
+        console.error(`Site não encontrado: ${siteId}`);
+        return NextResponse.json(
+          { error: 'Site não encontrado' },
+          { status: 404 }
+        );
+      }
+      
+      console.log('Site encontrado:', {
+        id: site._id.toString(),
+        slug: site.slug,
+        paid: site.paid
+      });
+    } catch (findError) {
+      console.error('Erro ao buscar site:', findError);
       return NextResponse.json(
-        { error: 'Site não encontrado' },
-        { status: 404 }
+        { error: 'Erro ao buscar site: ' + findError.message },
+        { status: 500 }
       );
     }
     
@@ -105,49 +79,73 @@ export async function POST(request) {
       customerEmail: site.customerEmail
     });
     
-    // Check if Stripe is properly configured
+    // Verifica se Stripe está configurado corretamente
     if (!process.env.STRIPE_SECRET_KEY) {
-      console.error('STRIPE_SECRET_KEY is not configured');
+      console.error('STRIPE_SECRET_KEY não está configurado');
       return NextResponse.json(
-        { error: 'Payment system is not properly configured' },
+        { error: 'Sistema de pagamento não está configurado corretamente' },
         { status: 500 }
       );
     }
     
-    // Cria uma sessão de checkout no Stripe
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Site Digital Personalizado',
-              description: `Presente para "${site.title}"`,
+    // Verifica se a URL base está configurada
+    if (!process.env.NEXT_PUBLIC_BASE_URL) {
+      console.error('NEXT_PUBLIC_BASE_URL não está configurado');
+      return NextResponse.json(
+        { error: 'URL base não está configurada corretamente' },
+        { status: 500 }
+      );
+    }
+    
+    // Cria uma sessão de checkout no Stripe com tratamento explícito de erros
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: 'Site Digital Personalizado',
+                description: `Presente para "${site.title}"`,
+              },
+              unit_amount: 400, // $4.00 em centavos
             },
-            unit_amount: 400, // $4.00 em centavos
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        mode: 'payment',
+        success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?site_id=${site._id}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/create`,
+        metadata: {
+          siteId: site._id.toString(),
+          slug: site.slug,
         },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?site_id=${site._id}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/create`,
-      metadata: {
-        siteId: site._id.toString(),
-        slug: site.slug,
-      },
-      customer_email: site.customerEmail || undefined,
-    });
+        customer_email: site.customerEmail || undefined,
+      });
+      
+      console.log('Sessão de checkout criada com sucesso:', {
+        sessionId: session.id,
+        url: session.url
+      });
+    } catch (stripeError) {
+      console.error('Erro ao criar sessão de checkout no Stripe:', stripeError);
+      return NextResponse.json(
+        { error: 'Falha ao criar sessão de checkout: ' + stripeError.message },
+        { status: 500 }
+      );
+    }
     
-    // Atualiza o site com o ID da sessão
-    site.checkoutSessionId = session.id;
-    await site.save();
-    
-    console.log('Sessão de checkout criada com sucesso:', {
-      sessionId: session.id,
-      url: session.url
-    });
+    // Atualiza o site com o ID da sessão - tratado separadamente
+    try {
+      site.checkoutSessionId = session.id;
+      await site.save();
+      console.log('Site atualizado com ID da sessão de checkout');
+    } catch (updateError) {
+      console.error('Erro ao atualizar site com ID da sessão:', updateError);
+      // Não crítico - continua mesmo se esta atualização falhar
+    }
     
     return NextResponse.json({
       success: true,
@@ -155,7 +153,7 @@ export async function POST(request) {
     });
     
   } catch (error) {
-    console.error('Erro ao criar sessão de checkout:', error);
+    console.error('Erro não tratado ao criar sessão de checkout:', error);
     return NextResponse.json(
       { error: 'Falha ao criar sessão de checkout: ' + error.message },
       { status: 500 }
