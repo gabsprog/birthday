@@ -9,8 +9,29 @@ const DeclarationTemplate = ({
   specialDate,
   youtubeLink = '',
   images = [],
-  mode = 'view' // 'view' or 'preview'
+  mode = 'view', // 'view' or 'preview'
+  customTexts = {} // Adicionando propriedade customTexts
 }) => {
+  const defaultTexts = {
+    headerTitle: 'Declaration of Love',
+    headerQuote: 'Just as the stars are constant in the night sky, so is my love for you: eternal, bright, and guiding my way.',
+    journeyTitle: 'Our Journey Among the Stars',
+    universeTitle: 'The Universe of Our Love',
+    universeSymbols: [
+      { title: 'Loyalty', description: 'Like a distant star that remains constant, my loyalty to you will never waver.' },
+      { title: 'Infinite Love', description: 'As vast as the universe itself, my love for you knows no limits or boundaries.' },
+      { title: 'Destiny', description: 'Like celestial bodies drawn together by gravity, we were meant to find each other.' }
+    ],
+    songTitle: 'The Soundtrack of Our Love',
+    songCaption: 'This melody speaks the words my heart cannot express',
+    messageTitle: 'My Declaration of Love',
+    signatureText: 'With all my love,',
+    signatureName: 'Always Yours',
+    promiseTitle: 'My Promise',
+    promiseText: 'I promise to love you, to cherish you, and to stand by your side through all of life\'s adventures. Like the stars that light up the darkest night, I will be there to illuminate your path, forever and always.',
+  };
+
+  const texts = { ...defaultTexts, ...customTexts };
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isStarfieldActive, setIsStarfieldActive] = useState(true);
   const [showNova, setShowNova] = useState(false);
@@ -205,7 +226,7 @@ const DeclarationTemplate = ({
 
         <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center z-20 leading-tight">
           <span className="block text-blue-300 text-2xl md:text-3xl mb-2 font-normal">A Heartfelt</span>
-          Declaration of Love
+          {texts.headerTitle}
         </h1>
         
         <h2 className="text-xl md:text-2xl font-medium text-center z-20 mb-4 max-w-2xl">
@@ -230,7 +251,7 @@ const DeclarationTemplate = ({
               <span className="absolute -bottom-4 -right-4 text-yellow-300 text-2xl opacity-60">✦</span>
               
               <blockquote className="text-xl md:text-2xl leading-relaxed font-medium italic">
-                "Just as the stars are constant in the night sky, so is my love for you: eternal, bright, and guiding my way."
+                "{texts.headerQuote}"
               </blockquote>
             </div>
           </div>
@@ -241,7 +262,7 @@ const DeclarationTemplate = ({
           <section className="py-16 px-4 bg-gradient-to-b from-blue-900 to-black">
             <div className="max-w-4xl mx-auto">
               <h3 className="text-2xl md:text-3xl font-semibold text-center mb-10 text-white">
-                Our Journey Among the Stars
+                {texts.journeyTitle}
               </h3>
               
               <div className="relative overflow-hidden rounded-2xl shadow-[0_0_30px_rgba(147,197,253,0.3)]">
@@ -307,55 +328,45 @@ const DeclarationTemplate = ({
         <section className="py-16 px-4 bg-black text-white">
           <div className="max-w-4xl mx-auto">
             <h3 className="text-2xl md:text-3xl font-semibold text-center mb-10">
-              The Universe of Our Love
+              {texts.universeTitle}
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Symbol 1 */}
-              <div className="bg-blue-900/40 backdrop-blur-sm rounded-xl p-6 transform transition-transform hover:scale-105">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
-                    <svg className="w-10 h-10 text-blue-300" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
+              {texts.universeSymbols.map((symbol, index) => {
+                const colors = [
+                  { bg: 'bg-blue-900/40', icon: 'bg-blue-500/20', text: 'text-blue-300', desc: 'text-blue-100/80' },
+                  { bg: 'bg-purple-900/40', icon: 'bg-purple-500/20', text: 'text-purple-300', desc: 'text-purple-100/80' },
+                  { bg: 'bg-indigo-900/40', icon: 'bg-indigo-500/20', text: 'text-indigo-300', desc: 'text-indigo-100/80' }
+                ][index % 3];
+                
+                const icons = [
+                  <svg key={1} className="w-10 h-10 text-blue-300" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>,
+                  <svg key={2} className="w-10 h-10 text-purple-300" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>,
+                  <svg key={3} className="w-10 h-10 text-indigo-300" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                ][index % 3];
+                
+                return (
+                  <div key={index} className={`${colors.bg} backdrop-blur-sm rounded-xl p-6 transform transition-transform hover:scale-105`}>
+                    <div className="flex flex-col items-center text-center">
+                      <div className={`w-16 h-16 rounded-full ${colors.icon} flex items-center justify-center mb-4`}>
+                        {icons}
+                      </div>
+                      <h4 className={`text-xl font-bold mb-2 ${colors.text}`}>{symbol.title}</h4>
+                      <p className={colors.desc}>
+                        {symbol.description}
+                      </p>
+                    </div>
                   </div>
-                  <h4 className="text-xl font-bold mb-2 text-blue-300">Loyalty</h4>
-                  <p className="text-blue-100/80">
-                    Like a distant star that remains constant, my loyalty to you will never waver.
-                  </p>
-                </div>
-              </div>
-              
-              {/* Symbol 2 */}
-              <div className="bg-purple-900/40 backdrop-blur-sm rounded-xl p-6 transform transition-transform hover:scale-105">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mb-4">
-                    <svg className="w-10 h-10 text-purple-300" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                    </svg>
-                  </div>
-                  <h4 className="text-xl font-bold mb-2 text-purple-300">Infinite Love</h4>
-                  <p className="text-purple-100/80">
-                    As vast as the universe itself, my love for you knows no limits or boundaries.
-                  </p>
-                </div>
-              </div>
-              
-              {/* Symbol 3 */}
-              <div className="bg-indigo-900/40 backdrop-blur-sm rounded-xl p-6 transform transition-transform hover:scale-105">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mb-4">
-                    <svg className="w-10 h-10 text-indigo-300" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                  </div>
-                  <h4 className="text-xl font-bold mb-2 text-indigo-300">Destiny</h4>
-                  <p className="text-indigo-100/80">
-                    Like celestial bodies drawn together by gravity, we were meant to find each other.
-                  </p>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -365,7 +376,7 @@ const DeclarationTemplate = ({
           <section className="py-16 px-4 bg-gradient-to-b from-black to-blue-900">
             <div className="max-w-3xl mx-auto">
               <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8 text-white">
-                The Soundtrack of Our Love
+                {texts.songTitle}
               </h3>
               
               <div className="relative rounded-xl overflow-hidden shadow-[0_0_30px_rgba(147,197,253,0.3)]">
@@ -381,7 +392,7 @@ const DeclarationTemplate = ({
               </div>
               
               <div className="mt-6 text-center text-white/80 italic">
-                <p>This melody speaks the words my heart cannot express</p>
+                <p>{texts.songCaption}</p>
               </div>
             </div>
           </section>
@@ -391,7 +402,7 @@ const DeclarationTemplate = ({
         <section className="py-16 px-4 bg-gradient-to-b from-blue-900 to-indigo-900 text-white">
           <div className="max-w-3xl mx-auto">
             <h3 className="text-2xl md:text-3xl font-semibold text-center mb-12">
-              My Declaration of Love
+              {texts.messageTitle}
             </h3>
             
             <div className="relative">
@@ -411,8 +422,8 @@ const DeclarationTemplate = ({
                 {/* Signature area */}
                 <div className="mt-10 flex justify-end">
                   <div className="text-right">
-                    <p className="text-lg font-medium italic">With all my love,</p>
-                    <p className="text-xl font-script mt-2">Always Yours</p>
+                    <p className="text-lg font-medium italic">{texts.signatureText}</p>
+                    <p className="text-xl font-script mt-2">{texts.signatureName}</p>
                   </div>
                 </div>
               </div>
@@ -433,10 +444,9 @@ const DeclarationTemplate = ({
               </div>
             </div>
             
-            <h3 className="text-2xl md:text-3xl font-semibold mb-4">My Promise</h3>
+            <h3 className="text-2xl md:text-3xl font-semibold mb-4">{texts.promiseTitle}</h3>
             <p className="text-lg text-white/80">
-              I promise to love you, to cherish you, and to stand by your side through all of life's adventures.
-              Like the stars that light up the darkest night, I will be there to illuminate your path, forever and always.
+              {texts.promiseText}
             </p>
           </div>
         </section>

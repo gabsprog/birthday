@@ -9,8 +9,26 @@ const AnniversaryTemplate = ({
   specialDate,
   youtubeLink = '',
   images = [],
-  mode = 'view' // 'view' or 'preview'
+  mode = 'view', // 'view' or 'preview'
+  customTexts = {} // Adicionando propriedade customTexts
 }) => {
+  const defaultTexts = {
+    headerTitle: 'Our Anniversary',
+    timeTogetherTitle: 'Time Together',
+    journeyTitle: 'Our Journey Together',
+    momentsTitle: 'Our Special Moments',
+    messageTitle: 'Anniversary Message',
+    songTitle: 'Our Special Song',
+    songCaption: 'This melody speaks the words my heart cannot express',
+    footerText: 'Happy Anniversary!',
+    journeyMilestones: [
+      { title: 'First Meeting', description: 'The day our paths crossed for the first time. It was the beginning of a beautiful journey.' },
+      { title: 'First Date', description: 'The butterflies, the excitement, the conversations that seemed to never end.' },
+      { title: 'Official Relationship', description: 'The day we decided to commit to each other, beginning this beautiful journey together.' },
+      { title: 'Special Milestone', description: 'A significant moment that made our bond even stronger. The journey continues with love growing each day.' }
+    ]
+  };
+  const texts = { ...defaultTexts, ...customTexts };
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [timeDifference, setTimeDifference] = useState(null);
   const [isCounterRunning, setIsCounterRunning] = useState(true);
@@ -230,7 +248,7 @@ const AnniversaryTemplate = ({
 
         <div className="text-center relative z-10">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
-            <span className="text-white/80">Our</span> Anniversary
+            <span className="text-white/80">Our</span> {texts.headerTitle.replace('Our ', '')}
           </h1>
           <h2 className="text-xl md:text-2xl font-medium text-center">
             {title}
@@ -253,7 +271,7 @@ const AnniversaryTemplate = ({
           <div className="max-w-3xl mx-auto">
             <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
-                Time Together
+                {texts.timeTogetherTitle}
               </span>
             </h3>
             
@@ -315,11 +333,11 @@ const AnniversaryTemplate = ({
       {/* Journey Timeline Section */}
       <section className="py-16 px-4 bg-white dark:bg-gray-800">
         <div className="max-w-3xl mx-auto">
-          <h3 className="text-2xl md:text-3xl font-semibold text-center mb-12">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
-              Our Journey Together
-            </span>
-          </h3>
+        <h3 className="text-2xl md:text-3xl font-semibold text-center mb-12">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
+            {texts.journeyTitle}
+          </span>
+        </h3>
           
           <div className="relative">
             {/* Timeline line */}
@@ -327,101 +345,88 @@ const AnniversaryTemplate = ({
             
             {/* Timeline items */}
             <div className="space-y-12">
-              {/* First meeting */}
-              <div className="relative">
-                <div className="flex flex-col md:flex-row items-center">
-                  <div className="md:w-1/2 flex md:justify-end mb-8 md:mb-0 md:pr-8">
-                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg shadow-md max-w-md">
-                      <h4 className="text-lg font-bold text-red-600 dark:text-red-400 mb-2">First Meeting</h4>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        The day our paths crossed for the first time. It was the beginning of a beautiful journey.
-                      </p>
+              {texts.journeyMilestones.map((milestone, index) => {
+                const isEven = index % 2 === 0;
+                const gradient = [
+                  'from-red-400 to-red-600',
+                  'from-pink-400 to-pink-600',
+                  'from-purple-400 to-purple-600',
+                  'from-indigo-400 to-indigo-600'
+                ][index % 4];
+                
+                const icon = [
+                  <svg key={1} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>,
+                  <svg key={2} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>,
+                  <svg key={3} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>,
+                  <svg key={4} className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                ][index % 4];
+                
+                const bgColorClass = isEven 
+                  ? "bg-red-50 dark:bg-red-900/20" 
+                  : index % 4 === 1 
+                    ? "bg-pink-50 dark:bg-pink-900/20"
+                    : index % 4 === 2
+                      ? "bg-purple-50 dark:bg-purple-900/20"
+                      : "bg-indigo-50 dark:bg-indigo-900/20";
+                
+                const textColorClass = isEven 
+                  ? "text-red-600 dark:text-red-400" 
+                  : index % 4 === 1 
+                    ? "text-pink-600 dark:text-pink-400"
+                    : index % 4 === 2
+                      ? "text-purple-600 dark:text-purple-400"
+                      : "text-indigo-600 dark:text-indigo-400";
+                
+                return (
+                  <div key={index} className="relative">
+                    <div className="flex flex-col md:flex-row items-center">
+                      {isEven ? (
+                        <div className="md:w-1/2 flex md:justify-end mb-8 md:mb-0 md:pr-8">
+                          <div className={`${bgColorClass} p-4 rounded-lg shadow-md max-w-md`}>
+                            <h4 className={`text-lg font-bold ${textColorClass} mb-2`}>{milestone.title}</h4>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              {milestone.description}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="md:w-1/2 mb-8 md:mb-0 md:pr-8">
+                          {/* Empty on second timeline item for right side layout */}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-center z-10 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
+                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-lg`}>
+                          {icon}
+                        </div>
+                      </div>
+                      
+                      {!isEven ? (
+                        <div className="md:w-1/2 md:pl-8">
+                          <div className={`${bgColorClass} p-4 rounded-lg shadow-md max-w-md`}>
+                            <h4 className={`text-lg font-bold ${textColorClass} mb-2`}>{milestone.title}</h4>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              {milestone.description}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="md:w-1/2 md:pl-8">
+                          {/* Empty on first timeline item for left side layout */}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center z-10 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white shadow-lg">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="md:w-1/2 md:pl-8">
-                    {/* Empty on first timeline item for left side layout */}
-                  </div>
-                </div>
-              </div>
-              
-              {/* First date */}
-              <div className="relative">
-                <div className="flex flex-col md:flex-row items-center">
-                  <div className="md:w-1/2 mb-8 md:mb-0 md:pr-8">
-                    {/* Empty on second timeline item for right side layout */}
-                  </div>
-                  <div className="flex items-center justify-center z-10 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white shadow-lg">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="md:w-1/2 md:pl-8">
-                    <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg shadow-md max-w-md">
-                      <h4 className="text-lg font-bold text-pink-600 dark:text-pink-400 mb-2">First Date</h4>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        The butterflies, the excitement, the conversations that seemed to never end.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Official relationship */}
-              <div className="relative">
-                <div className="flex flex-col md:flex-row items-center">
-                  <div className="md:w-1/2 flex md:justify-end mb-8 md:mb-0 md:pr-8">
-                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg shadow-md max-w-md">
-                      <h4 className="text-lg font-bold text-purple-600 dark:text-purple-400 mb-2">Official Relationship</h4>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        The day we decided to commit to each other, beginning this beautiful journey together.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center z-10 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white shadow-lg">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="md:w-1/2 md:pl-8">
-                    {/* Empty on third timeline item for left side layout */}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Special Milestone */}
-              <div className="relative">
-                <div className="flex flex-col md:flex-row items-center">
-                  <div className="md:w-1/2 mb-8 md:mb-0 md:pr-8">
-                    {/* Empty on fourth timeline item for right side layout */}
-                  </div>
-                  <div className="flex items-center justify-center z-10 md:absolute md:left-1/2 md:transform md:-translate-x-1/2">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white shadow-lg">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="md:w-1/2 md:pl-8">
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg shadow-md max-w-md">
-                      <h4 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-2">Special Milestone</h4>
-                      <p className="text-gray-700 dark:text-gray-300">
-                        A significant moment that made our bond even stronger. The journey continues with love growing each day.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -433,7 +438,7 @@ const AnniversaryTemplate = ({
           <div className="max-w-3xl mx-auto">
             <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
-                Our Special Moments
+                {texts.momentsTitle}
               </span>
             </h3>
             
@@ -525,7 +530,7 @@ const AnniversaryTemplate = ({
           <div className="max-w-3xl mx-auto">
             <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
-                Our Special Song
+                {texts.songTitle}
               </span>
             </h3>
             
@@ -547,11 +552,11 @@ const AnniversaryTemplate = ({
       {/* Anniversary message */}
       <section className="py-16 px-4 bg-gradient-to-r from-red-50 to-purple-50 dark:from-red-900/20 dark:to-purple-900/20">
         <div className="max-w-3xl mx-auto">
-          <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
-              Anniversary Message
-            </span>
-          </h3>
+        <h3 className="text-2xl md:text-3xl font-semibold text-center mb-8">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-500">
+            {texts.messageTitle}
+          </span>
+        </h3>
           
           <div className="relative">
             {/* Decorative elements */}
@@ -583,7 +588,7 @@ const AnniversaryTemplate = ({
       {/* Footer */}
       <footer className="bg-gradient-to-br from-red-400 via-purple-500 to-indigo-500 text-white py-6">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <p className="text-lg font-medium">Happy Anniversary!</p>
+          <p className="text-lg font-medium">{texts.footerText}</p>
           <p className="text-sm mt-2 opacity-80">Created with love on BirthdayLove.site</p>
         </div>
       </footer>
