@@ -30,8 +30,8 @@ async function getMongoConnection() {
       socketTimeoutMS: 30000,
       serverSelectionTimeoutMS: 10000,
       family: 4, // Forçar IPv4
-      keepAlive: true,
-      keepAliveInitialDelay: 300000
+      // keepAlive: true,
+      // keepAliveInitialDelay: 300000
     };
 
     await mongoose.connect(MONGODB_URI, options);
