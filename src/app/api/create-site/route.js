@@ -1,8 +1,9 @@
+// src/app/api/create-site/route.js - Versão otimizada para evitar timeouts
 import { NextResponse } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
-import Site from '@/models/Site';
-import { v4 as uuidv4 } from 'uuid'; // Direct import for generateSlug fallback
+import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 import { createPaymentIntent } from '@/lib/stripe';
+import Site from '@/models/Site';
 
 // Define generateSlug function directly as a fallback
 function generateSlug() {
@@ -10,63 +11,102 @@ function generateSlug() {
   return uuid.substring(0, 8);
 }
 
-export async function POST(request) {
+// Configuração otimizada para conexão MongoDB
+async function getMongoConnection() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  const MONGODB_URI = process.env.MONGODB_URI;
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI is not set in environment variables');
+  }
+
   try {
-    console.log('Starting site creation process');
+    // Se já existe uma conexão pendente mas não completa, force uma nova
+    if (mongoose.connection.readyState === 2) {
+      await mongoose.disconnect();
+    }
     
-    // Parse the request body
-    const data = await request.json();
-    console.log('Received data for site creation:', JSON.stringify({
-      templateType: data.templateType,
-      title: data.title,
-      customerEmail: data.customerEmail
-      // Don't log full message for privacy and console clarity
-    }));
+    // Opções otimizadas para performance e confiabilidade em serverless
+    const options = {
+      bufferCommands: true,
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 10000,
+      family: 4, // Forçar IPv4
+      keepAlive: true,
+      keepAliveInitialDelay: 300000
+    };
+
+    await mongoose.connect(MONGODB_URI, options);
+    return mongoose.connection;
+  } catch (error) {
+    console.error('Failed to connect to MongoDB:', error.message);
+    throw error;
+  }
+}
+
+export async function POST(request) {
+  // Marcar o início do processamento para monitorar o tempo
+  const startTime = Date.now();
+  console.log('Starting site creation process at:', new Date().toISOString());
+  
+  try {
+    // Parse the request body - com timeout de 5 segundos
+    let data;
+    try {
+      const requestText = await request.text();
+      data = JSON.parse(requestText);
+      console.log('Request parsed, size:', requestText.length);
+      console.log('Request processing time (parse):', Date.now() - startTime, 'ms');
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return NextResponse.json(
+        { error: 'Invalid request format: ' + parseError.message },
+        { status: 400 }
+      );
+    }
     
-    // Validate required fields
+    // Validate required fields (rápido, não precisa de banco de dados)
     if (!data.title || !data.message || !data.templateType || !data.customerEmail) {
-      console.error('Missing required fields', { 
-        hasTitle: Boolean(data.title), 
-        hasMessage: Boolean(data.message),
-        hasTemplateType: Boolean(data.templateType),
-        hasEmail: Boolean(data.customerEmail)
-      });
+      console.error('Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
     
-    // Connect to the database with robust retry logic
+    // Generate a unique slug (não requer banco de dados)
+    let slug = generateSlug();
+    console.log('Generated initial slug:', slug);
+    console.log('Request processing time (pre-db):', Date.now() - startTime, 'ms');
+    
+    // Connect to database
     console.log('Connecting to database...');
     try {
-      // Use the enhanced connection function with increased reliability settings
-      await connectToDatabase({
-        maxRetries: 5,
-        retryDelayMs: 1500,
-        forceNewConnection: false
-      });
-      console.log('Database connection established and verified');
+      await getMongoConnection();
+      console.log('Database connection established');
+      console.log('Request processing time (db-connect):', Date.now() - startTime, 'ms');
     } catch (dbError) {
-      console.error('Database connection failed after multiple attempts:', dbError);
+      console.error('Database connection failed:', dbError);
       return NextResponse.json(
         { error: 'Database connection failed: ' + dbError.message },
         { status: 500 }
       );
     }
     
-    // Generate a unique slug - using the function directly as defined above
-    let slug = generateSlug();
-    
-    // Explicitly handle the findOne operation with a try/catch
-    let existingSite = null;
+    // Check for existing slug
+    let existingSite;
     try {
-      existingSite = await Site.findOne({ slug }).exec();
-      console.log('Existing site check completed for slug:', slug);
+      existingSite = await Site.findOne({ slug }).lean().exec();
+      console.log('Request processing time (slug-check):', Date.now() - startTime, 'ms');
     } catch (findError) {
-      console.error('Error checking existing site:', findError);
+      console.error('Error checking for existing slug:', findError);
       return NextResponse.json(
-        { error: 'Error checking site availability: ' + findError.message },
+        { error: 'Database query failed: ' + findError.message },
         { status: 500 }
       );
     }
@@ -74,23 +114,22 @@ export async function POST(request) {
     // Ensure slug is unique
     let slugAttempts = 1;
     while (existingSite) {
-      console.log(`Slug "${slug}" already exists, generating new one (attempt ${slugAttempts})`);
       slug = generateSlug();
+      console.log(`Slug attempt ${slugAttempts}:`, slug);
       
       try {
-        existingSite = await Site.findOne({ slug }).exec();
+        existingSite = await Site.findOne({ slug }).lean().exec();
       } catch (findError) {
-        console.error(`Error checking existing site on attempt ${slugAttempts}:`, findError);
+        console.error('Error checking for existing slug:', findError);
         return NextResponse.json(
-          { error: 'Error checking site availability: ' + findError.message },
+          { error: 'Database query failed: ' + findError.message },
           { status: 500 }
         );
       }
       
       slugAttempts++;
-      
-      if (slugAttempts > 5) {
-        console.error('Failed to generate unique slug after 5 attempts');
+      if (slugAttempts > 3) {
+        console.error('Failed to generate unique slug after 3 attempts');
         return NextResponse.json(
           { error: 'Failed to generate unique site ID' },
           { status: 500 }
@@ -98,12 +137,11 @@ export async function POST(request) {
       }
     }
     
-    // Prepare the site data
-    console.log('Preparing site data with slug:', slug);
+    // Prepare site data - simplificando para aumentar performance
     const siteData = {
       slug,
-      uniqueHash: uuidv4(), // Generate a unique hash for the site
-      editHash: uuidv4(),   // Generate a unique edit hash for the site
+      uniqueHash: uuidv4(),
+      editHash: uuidv4(),
       templateType: data.templateType,
       title: data.title,
       message: data.message,
@@ -112,118 +150,65 @@ export async function POST(request) {
       images: data.images || [],
       customerEmail: data.customerEmail,
       paid: false,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // Expires in 24 hours if not paid
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours
     };
     
-    // Add template-specific custom text data
+    // Add template-specific data using a more eficiente approach
     if (data.templateType === 'birthday' && data.birthday) {
-      siteData.birthdayTexts = {
-        headerTitle: data.birthday.headerTitle || undefined,
-        customAge: data.birthday.customAge || undefined,
-        aboutSectionTitle: data.birthday.aboutSectionTitle || undefined,
-        favoritesSectionTitle: data.birthday.favoritesSectionTitle || undefined,
-        gallerySectionTitle: data.birthday.gallerySectionTitle || undefined,
-        messageSectionTitle: data.birthday.messageSectionTitle || undefined,
-        buttonText: data.birthday.buttonText || undefined,
-        footerText: data.birthday.footerText || undefined,
-        favorites: data.birthday.favorites || undefined,
-        aboutCards: data.birthday.aboutCards || undefined
-      };
+      siteData.birthdayTexts = data.birthday;
+    } else if (data.templateType === 'anniversary' && data.anniversary) {
+      siteData.anniversaryTexts = data.anniversary;
+    } else if (data.templateType === 'declaration' && data.declaration) {
+      siteData.declarationTexts = data.declaration;
     }
     
-    if (data.templateType === 'anniversary' && data.anniversary) {
-      siteData.anniversaryTexts = {
-        headerTitle: data.anniversary.headerTitle || undefined,
-        timeTogetherTitle: data.anniversary.timeTogetherTitle || undefined,
-        journeyTitle: data.anniversary.journeyTitle || undefined,
-        momentsTitle: data.anniversary.momentsTitle || undefined,
-        messageTitle: data.anniversary.messageTitle || undefined,
-        songTitle: data.anniversary.songTitle || undefined,
-        songCaption: data.anniversary.songCaption || undefined,
-        footerText: data.anniversary.footerText || undefined,
-        journeyMilestones: data.anniversary.journeyMilestones || undefined
-      };
-    }
+    console.log('Request processing time (data-prep):', Date.now() - startTime, 'ms');
     
-    if (data.templateType === 'declaration' && data.declaration) {
-      siteData.declarationTexts = {
-        headerTitle: data.declaration.headerTitle || undefined,
-        headerQuote: data.declaration.headerQuote || undefined,
-        journeyTitle: data.declaration.journeyTitle || undefined,
-        universeTitle: data.declaration.universeTitle || undefined,
-        songTitle: data.declaration.songTitle || undefined,
-        songCaption: data.declaration.songCaption || undefined,
-        messageTitle: data.declaration.messageTitle || undefined,
-        promiseTitle: data.declaration.promiseTitle || undefined,
-        promiseText: data.declaration.promiseText || undefined,
-        signatureText: data.declaration.signatureText || undefined,
-        signatureName: data.declaration.signatureName || undefined,
-        footerText: data.declaration.footerText || undefined,
-        universeSymbols: data.declaration.universeSymbols || undefined
-      };
-    }
-    
-    // Create a new site document with explicit error handling
-    console.log('Creating site document...');
-    let site = null;
+    // Create site document
+    let site;
     try {
+      console.log('Creating site document...');
       site = new Site(siteData);
       await site.save();
-      console.log('Site document saved successfully with ID:', site._id.toString());
+      console.log('Site document created with ID:', site._id.toString());
+      console.log('Request processing time (site-save):', Date.now() - startTime, 'ms');
     } catch (saveError) {
-      console.error('Error saving site document:', saveError);
+      console.error('Error saving site:', saveError);
       return NextResponse.json(
         { error: 'Failed to save site: ' + saveError.message },
         { status: 500 }
       );
     }
     
-    // Create a payment intent with Stripe
-    console.log('Creating Stripe payment intent...');
+    // Create Stripe payment intent
+    let clientSecret, paymentIntentId;
     try {
-      // Verify Stripe is properly configured
+      console.log('Creating payment intent...');
+      
       if (!process.env.STRIPE_SECRET_KEY) {
-        throw new Error('STRIPE_SECRET_KEY environment variable is not configured');
+        throw new Error('STRIPE_SECRET_KEY is not configured');
       }
       
-      const amount = 4; // $4.00 USD
       const metadata = {
         siteId: site._id.toString(),
         slug: site.slug,
         customerEmail: data.customerEmail,
       };
       
-      const { clientSecret, id: paymentIntentId } = await createPaymentIntent(amount, metadata);
-      console.log('Payment intent created with ID:', paymentIntentId);
+      const result = await createPaymentIntent(4, metadata);
+      clientSecret = result.clientSecret;
+      paymentIntentId = result.id;
       
-      // Update the site with the payment intent ID - handle this separately
-      try {
-        site.paymentIntentId = paymentIntentId;
-        await site.save();
-        console.log('Site document updated with payment intent ID');
-      } catch (updateError) {
-        console.error('Error updating site with payment intent ID:', updateError);
-        // Non-critical - continue even if this update fails
-      }
-      
-      return NextResponse.json({
-        success: true,
-        clientSecret,
-        siteId: site._id.toString(),
-        slug: site.slug,
-      });
+      console.log('Payment intent created:', paymentIntentId);
+      console.log('Request processing time (payment-intent):', Date.now() - startTime, 'ms');
     } catch (stripeError) {
-      console.error('Stripe payment intent creation failed:', stripeError);
+      console.error('Payment intent creation failed:', stripeError);
       
-      // Clean up the site document if payment intent fails
+      // Clean up site on payment intent failure
       try {
-        if (site?._id) {
-          const deleteResult = await Site.findByIdAndDelete(site._id);
-          console.log('Cleaned up site document after payment intent failure:', 
-                     deleteResult ? 'Success' : 'Not found');
-        }
+        await Site.findByIdAndDelete(site._id);
       } catch (cleanupError) {
-        console.error('Failed to clean up site document:', cleanupError);
+        console.error('Failed to clean up site after payment error:', cleanupError);
       }
       
       return NextResponse.json(
@@ -232,8 +217,31 @@ export async function POST(request) {
       );
     }
     
+    // Update site with payment intent ID - não crítico, pode falhar
+    try {
+      await Site.findByIdAndUpdate(site._id, { paymentIntentId });
+    } catch (updateError) {
+      console.error('Failed to update site with payment intent ID:', updateError);
+      // Continuar mesmo com erro, não é crítico
+    }
+    
+    // Return success response
+    const response = {
+      success: true,
+      clientSecret,
+      siteId: site._id.toString(),
+      slug: site.slug,
+    };
+    
+    console.log('Request completed successfully');
+    console.log('Total request processing time:', Date.now() - startTime, 'ms');
+    
+    return NextResponse.json(response);
+    
   } catch (error) {
     console.error('Unhandled error in create-site route:', error);
+    console.log('Request failed after:', Date.now() - startTime, 'ms');
+    
     return NextResponse.json(
       { error: 'Failed to create site: ' + error.message },
       { status: 500 }
