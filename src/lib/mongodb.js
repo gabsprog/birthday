@@ -1,4 +1,4 @@
-// src/lib/mongodb.js - With fallback to memory storage
+// src/lib/mongodb.js - With improved connection handling
 import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -12,7 +12,8 @@ if (!cached) {
 
 async function connectToDatabase() {
   // If we have a connection, return it
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    console.log('Using existing MongoDB connection');
     return cached.conn;
   }
 
@@ -22,35 +23,67 @@ async function connectToDatabase() {
     return setupMockDatabase();
   }
 
-  // If we don't have a promise yet, create one
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000
-    };
-
-    console.log('Connecting to MongoDB...');
-    
-    cached.promise = mongoose
-      .connect(MONGODB_URI, opts)
-      .then((mongoose) => {
-        console.log('MongoDB connected successfully');
-        return mongoose;
-      })
-      .catch((err) => {
-        console.error('MongoDB connection error:', err);
-        console.warn('Falling back to in-memory mock database');
-        cached.promise = null;
-        return setupMockDatabase();
-      });
-  }
-
   try {
+    // Reset state if the connection was closed or errored out
+    if (mongoose.connection.readyState === 0 || mongoose.connection.readyState === 3) {
+      cached.promise = null;
+      cached.conn = null;
+      console.log('Previous connection was closed or had error, creating new connection');
+    }
+    
+    // If we don't have a promise yet, create one
+    if (!cached.promise) {
+      const opts = {
+        bufferCommands: true, // Allow buffering commands before connection is established
+        serverSelectionTimeoutMS: 10000, // Increased from 5000ms
+        connectTimeoutMS: 20000, // Increased from 10000ms
+        socketTimeoutMS: 45000, // Add socket timeout
+        family: 4, // Use IPv4, skip trying IPv6
+        maxPoolSize: 10, // Keep up to 10 connections open
+      };
+
+      console.log('Connecting to MongoDB...');
+      
+      cached.promise = mongoose
+        .connect(MONGODB_URI, opts)
+        .then((mongoose) => {
+          console.log('MongoDB connected successfully');
+          return mongoose;
+        });
+    } else {
+      console.log('Reusing existing MongoDB connection promise');
+    }
+
     cached.conn = await cached.promise;
+    
+    // Setup error handlers to catch connection issues
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+      // Reset on errors for the next connection attempt
+      if (err.name === 'MongoNetworkError' || err.name === 'MongoServerSelectionError') {
+        cached.promise = null;
+        cached.conn = null;
+      }
+    });
+    
+    mongoose.connection.on('disconnected', () => {
+      console.warn('MongoDB disconnected, will reconnect on next request');
+      cached.promise = null;
+      cached.conn = null;
+    });
+    
     return cached.conn;
   } catch (e) {
+    console.error('Error establishing MongoDB connection:', e.message);
     cached.promise = null;
+    cached.conn = null;
+    
+    // Fallback to mock database in case of connection failure in production
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('Falling back to in-memory mock database in production');
+      return setupMockDatabase();
+    }
+    
     throw e;
   }
 }

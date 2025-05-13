@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
+import mongoose from 'mongoose';
 import Site from '@/models/Site';
 import { v4 as uuidv4 } from 'uuid'; // Direct import for generateSlug fallback
 import { createPaymentIntent } from '@/lib/stripe';
@@ -8,6 +8,51 @@ import { createPaymentIntent } from '@/lib/stripe';
 function generateSlug() {
   const uuid = uuidv4();
   return uuid.substring(0, 8);
+}
+
+// Improved MongoDB connection with retry logic
+async function connectWithRetry(retries = 5, delay = 500) {
+  const MONGODB_URI = process.env.MONGODB_URI;
+  
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI is not defined in environment variables');
+  }
+  
+  // Check if already connected
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+  
+  let lastError;
+  
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`MongoDB connection attempt ${i + 1}/${retries}...`);
+      
+      // Connect with proper options
+      const connection = await mongoose.connect(MONGODB_URI, {
+        bufferCommands: true, // Changed to true to allow buffering commands
+        serverSelectionTimeoutMS: 10000, // Increased timeout
+        connectTimeoutMS: 20000, // Increased timeout
+        socketTimeoutMS: 45000, // Increased socket timeout
+      });
+      
+      console.log('MongoDB connection successful');
+      return connection;
+    } catch (error) {
+      console.error(`MongoDB connection attempt ${i + 1} failed:`, error.message);
+      lastError = error;
+      
+      // Wait before trying again
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        // Exponential backoff
+        delay *= 2;
+      }
+    }
+  }
+  
+  throw new Error(`Failed to connect to MongoDB after ${retries} attempts: ${lastError.message}`);
 }
 
 export async function POST(request) {
@@ -37,10 +82,10 @@ export async function POST(request) {
       );
     }
     
-    // Connect to the database
+    // Connect to the database with retry logic
     console.log('Connecting to database...');
     try {
-      await connectToDatabase();
+      await connectWithRetry();
       console.log('Database connection established');
     } catch (dbError) {
       console.error('Database connection failed:', dbError);
