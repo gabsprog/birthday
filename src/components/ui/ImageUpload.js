@@ -1,8 +1,11 @@
+// Updated to use client-side Cloudinary upload
+
 'use client';
 
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { validateImage } from '@/lib/utils';
+import { uploadToCloudinary } from '@/lib/cloudinaryUpload';
 
 const ImageUpload = ({
   onImageUpload,
@@ -15,6 +18,7 @@ const ImageUpload = ({
   const [error, setError] = useState('');
   const [detailedError, setDetailedError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
 
   const onDrop = useCallback(async (acceptedFiles) => {
     // Reset errors
@@ -47,19 +51,41 @@ const ImageUpload = ({
     // Process valid files
     if (validFiles.length > 0) {
       setIsUploading(true);
+      
+      // Initialize progress tracking for each file
+      const newProgress = {};
+      validFiles.forEach((file, index) => {
+        newProgress[index] = 0;
+      });
+      setUploadProgress(newProgress);
+      
       try {
-        await onImageUpload(validFiles);
+        // Upload each file directly to Cloudinary
+        const uploadPromises = validFiles.map((file, index) => {
+          return uploadToCloudinary(file, (progress) => {
+            // Update progress for this specific file
+            setUploadProgress(prev => ({
+              ...prev,
+              [index]: progress
+            }));
+          });
+        });
+        
+        const results = await Promise.all(uploadPromises);
+        
+        // Call the parent component's callback with the uploaded image URLs
+        const uploadedUrls = results.map(result => result.url);
+        onImageUpload(uploadedUrls);
       } catch (uploadError) {
         console.error('Error during image upload:', uploadError);
         setError('Failed to upload images. Please try again.');
         
-        if (uploadError.response && uploadError.response.data) {
-          setDetailedError(`Error details: ${uploadError.response.data.error || JSON.stringify(uploadError.response.data)}`);
-        } else if (uploadError.message) {
+        if (uploadError.message) {
           setDetailedError(`Error details: ${uploadError.message}`);
         }
       } finally {
         setIsUploading(false);
+        setUploadProgress({});
       }
     }
   }, [uploadedImages, maxImages, onImageUpload]);
@@ -74,6 +100,14 @@ const ImageUpload = ({
     },
     maxFiles: maxImages - uploadedImages.length,
   });
+  
+  // Calculate overall progress
+  const calculateOverallProgress = () => {
+    if (Object.keys(uploadProgress).length === 0) return 0;
+    
+    const totalProgress = Object.values(uploadProgress).reduce((sum, progress) => sum + progress, 0);
+    return totalProgress / Object.keys(uploadProgress).length;
+  };
   
   return (
     <div className={className}>
@@ -140,12 +174,22 @@ const ImageUpload = ({
       )}
 
       {isUploading && (
-        <div className="mt-2 flex items-center text-sm text-gray-500">
-          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Uploading images...</span>
+        <div className="mt-2">
+          <div className="flex items-center text-sm text-gray-500">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Uploading images... {Math.round(calculateOverallProgress())}%</span>
+          </div>
+          
+          {/* Progress bar */}
+          <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
+            <div 
+              className="h-full bg-primary-500 rounded-full transition-all duration-300"
+              style={{ width: `${calculateOverallProgress()}%` }}
+            ></div>
+          </div>
         </div>
       )}
       
