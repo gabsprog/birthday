@@ -263,41 +263,61 @@ const SiteEditor = () => {
   // Handle form submission
   // Locate this function in src/components/SiteEditor.js and replace it with this version
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  // Validar formulário
+  const errors = validateForm();
+  
+  if (Object.keys(errors).length > 0) {
+    setFormErrors(errors);
+    return;
+  }
+  
+  setIsLoading(true);
+  
+  try {
+    console.log('Iniciando processo de criação do site...');
     
-    // Validar formulário
-    const errors = validateForm();
+    // Criar o site
+    const createSiteResponse = await axios.post('/api/create-site', formData, {
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
     
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
+    console.log('Resposta recebida de create-site:', createSiteResponse.data);
     
-    setIsLoading(true);
-    
-    try {
-      console.log('Iniciando processo de criação do site...');
+    if (createSiteResponse.data.success) {
+      const siteId = createSiteResponse.data.siteId;
       
-      // Criar o site
-      const createSiteResponse = await axios.post('/api/create-site', formData, {
-        timeout: 30000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      // Criar a sessão de checkout
+      console.log('Criando sessão de checkout para o site:', siteId);
+      const checkoutResponse = await axios.post('/api/create-checkout', {
+        siteId: siteId
       });
       
-      console.log('Resposta recebida de create-site:', createSiteResponse.data);
+      console.log('Resposta de checkout:', checkoutResponse.data);
       
-      if (createSiteResponse.data.success) {
-        const siteId = createSiteResponse.data.siteId;
+      if (checkoutResponse.data.success) {
+        // Se já estiver pago, redirecionar para a página de sucesso
+        if (checkoutResponse.data.paid) {
+          router.push(`/success?site_id=${siteId}`);
+          return;
+        }
         
-        // Redirecionar para a página de pagamento
-        router.push(`/payment?site_id=${siteId}`);
+        // Redirecionar para a página de checkout do Stripe
+        console.log('Redirecionando para:', checkoutResponse.data.url);
+        window.location.href = checkoutResponse.data.url;
       } else {
-        console.error('Erro na resposta de criação do site:', createSiteResponse.data);
-        alert('Erro ao criar o site. Por favor, tente novamente.');
+        console.error('Erro na resposta do checkout:', checkoutResponse.data);
+        alert('Erro ao criar a sessão de pagamento. Por favor, tente novamente.');
       }
-    } catch (error) {
+    } else {
+      console.error('Erro na resposta de criação do site:', createSiteResponse.data);
+      alert('Erro ao criar o site. Por favor, tente novamente.');
+    }
+  } catch (error) {
       console.error('Erro durante o processo:', error);
       
       // Tratamento de erro
