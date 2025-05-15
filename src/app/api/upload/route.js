@@ -1,9 +1,7 @@
-// src/app/api/upload/route.js
+// Replace the contents of src/app/api/upload/route.js with this:
+
 import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import fs from 'fs';
-import { join } from 'path';
-import os from 'os';
 
 // Configure Cloudinary with explicit configuration
 cloudinary.config({
