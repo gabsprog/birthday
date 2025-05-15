@@ -20,11 +20,11 @@
       "maxDuration": 30
     },
     "src/app/api/upload/route.js": {
-      "memory": 1024,
+      "memory": 3008,
       "maxDuration": 60
     }
   },
   "env": {
-    "NODE_OPTIONS": "--max-old-space-size=1024"
+    "NODE_OPTIONS": "--max-http-header-size=16384"
   }
 }
