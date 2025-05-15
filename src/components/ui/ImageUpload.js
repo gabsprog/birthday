@@ -13,10 +13,13 @@ const ImageUpload = ({
   className = '',
 }) => {
   const [error, setError] = useState('');
+  const [detailedError, setDetailedError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
-  const onDrop = useCallback(acceptedFiles => {
-    // Reset error
+  const onDrop = useCallback(async (acceptedFiles) => {
+    // Reset errors
     setError('');
+    setDetailedError('');
     
     // Check if adding more files would exceed the limit
     if (uploadedImages.length + acceptedFiles.length > maxImages) {
@@ -43,7 +46,21 @@ const ImageUpload = ({
     
     // Process valid files
     if (validFiles.length > 0) {
-      onImageUpload(validFiles);
+      setIsUploading(true);
+      try {
+        await onImageUpload(validFiles);
+      } catch (uploadError) {
+        console.error('Error during image upload:', uploadError);
+        setError('Failed to upload images. Please try again.');
+        
+        if (uploadError.response && uploadError.response.data) {
+          setDetailedError(`Error details: ${uploadError.response.data.error || JSON.stringify(uploadError.response.data)}`);
+        } else if (uploadError.message) {
+          setDetailedError(`Error details: ${uploadError.message}`);
+        }
+      } finally {
+        setIsUploading(false);
+      }
     }
   }, [uploadedImages, maxImages, onImageUpload]);
   
@@ -107,7 +124,29 @@ const ImageUpload = ({
       </div>
       
       {error && (
-        <p className="mt-2 text-sm text-red-500">{error}</p>
+        <div className="mt-2 text-sm text-red-500">
+          <p>{error}</p>
+          {detailedError && <p className="text-xs mt-1">{detailedError}</p>}
+          <button 
+            className="text-blue-500 text-xs mt-1 underline"
+            onClick={() => {
+              setError('');
+              setDetailedError('');
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {isUploading && (
+        <div className="mt-2 flex items-center text-sm text-gray-500">
+          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Uploading images...</span>
+        </div>
       )}
       
       {uploadedImages.length > 0 && (

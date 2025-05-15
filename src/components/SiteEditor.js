@@ -160,30 +160,61 @@ const SiteEditor = () => {
   // Handle image upload
   const handleImageUpload = async (files) => {
     setIsLoading(true);
+    setFormErrors((prev) => ({ ...prev, imageUpload: '' }));
     
     try {
       const uploadPromises = files.map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await axios.post('/api/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        
-        return response.data.url;
+        try {
+          const response = await axios.post('/api/upload', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 30000, // 30 second timeout
+          });
+          
+          return response.data.url;
+        } catch (uploadError) {
+          console.error('Error uploading file:', file.name, uploadError);
+          
+          // Capture more detailed error information
+          let errorMessage = 'Upload failed';
+          if (uploadError.response) {
+            // The server responded with an error
+            errorMessage = uploadError.response.data?.error || `Server error: ${uploadError.response.status}`;
+          } else if (uploadError.request) {
+            // The request was made but no response was received
+            errorMessage = 'No response from server. Please check your internet connection.';
+          } else {
+            // Something happened in setting up the request
+            errorMessage = uploadError.message;
+          }
+          
+          throw new Error(`Failed to upload ${file.name}: ${errorMessage}`);
+        }
       });
       
-      const uploadedImageUrls = await Promise.all(uploadPromises);
-      
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...uploadedImageUrls],
-      }));
+      try {
+        const uploadedImageUrls = await Promise.all(uploadPromises);
+        
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, ...uploadedImageUrls],
+        }));
+      } catch (error) {
+        setFormErrors((prev) => ({ 
+          ...prev, 
+          imageUpload: error.message 
+        }));
+      }
     } catch (error) {
-      console.error('Error uploading images:', error);
-      alert('Failed to upload images. Please try again.');
+      console.error('Error in image upload process:', error);
+      setFormErrors((prev) => ({ 
+        ...prev, 
+        imageUpload: 'Failed to upload images. Please try again.' 
+      }));
     } finally {
       setIsLoading(false);
     }
