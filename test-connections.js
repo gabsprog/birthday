@@ -94,8 +94,13 @@ async function testConnections() {
     // Test creating a payment intent
     console.log('Testing payment intent creation...');
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: 400, // $4.00
-      currency: 'usd',
+      amount: 100, // $4.00
+      currency: 'brl',
+      payment_method_options: {
+        card: {
+          request_three_d_secure: 'any' // Solicita 3DS quando disponível
+        }
+      },
       metadata: {
         test: 'true',
         timestamp: Date.now().toString()

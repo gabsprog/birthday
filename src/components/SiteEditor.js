@@ -276,19 +276,11 @@ const SiteEditor = () => {
     setIsLoading(true);
     
     try {
-      // Adicionar log para depuração
       console.log('Iniciando processo de criação do site...');
-      console.log('Dados do formulário:', {
-        templateType: formData.templateType,
-        title: formData.title,
-        customerEmail: formData.customerEmail,
-        // Não logar a mensagem completa por privacidade
-      });
       
       // Criar o site
-      console.log('Enviando requisição para /api/create-site...');
       const createSiteResponse = await axios.post('/api/create-site', formData, {
-        timeout: 30000, // Aumentar timeout para 30 segundos
+        timeout: 30000,
         headers: {
           'Content-Type': 'application/json',
         }
@@ -299,28 +291,8 @@ const SiteEditor = () => {
       if (createSiteResponse.data.success) {
         const siteId = createSiteResponse.data.siteId;
         
-        // Criar a sessão de checkout
-        console.log('Criando sessão de checkout para o site:', siteId);
-        const checkoutResponse = await axios.post('/api/create-checkout', {
-          siteId: siteId
-        });
-        
-        console.log('Resposta de checkout:', checkoutResponse.data);
-        
-        if (checkoutResponse.data.success) {
-          // Se já estiver pago, redirecionar para a página de sucesso
-          if (checkoutResponse.data.paid) {
-            router.push(`/success?site_id=${siteId}`);
-            return;
-          }
-          
-          // Redirecionar para a página de checkout do Stripe
-          console.log('Redirecionando para:', checkoutResponse.data.url);
-          window.location.href = checkoutResponse.data.url;
-        } else {
-          console.error('Erro na resposta do checkout:', checkoutResponse.data);
-          alert('Erro ao criar a sessão de pagamento. Por favor, tente novamente.');
-        }
+        // Redirecionar para a página de pagamento
+        router.push(`/payment?site_id=${siteId}`);
       } else {
         console.error('Erro na resposta de criação do site:', createSiteResponse.data);
         alert('Erro ao criar o site. Por favor, tente novamente.');
@@ -328,11 +300,10 @@ const SiteEditor = () => {
     } catch (error) {
       console.error('Erro durante o processo:', error);
       
-      // Tratamento de erro aprimorado
+      // Tratamento de erro
       let errorMessage = 'Falha ao criar seu site. Por favor, tente novamente.';
       
       if (error.response) {
-        // O servidor respondeu com um status de erro
         console.error('Erro do servidor:', {
           status: error.response.status,
           data: error.response.data
@@ -342,17 +313,14 @@ const SiteEditor = () => {
           error.response.data?.error || 'Erro desconhecido'
         }`;
       } else if (error.request) {
-        // A requisição foi feita mas não houve resposta
         console.error('Sem resposta do servidor. Requisição:', error.request);
         errorMessage = 'Sem resposta do servidor. A requisição expirou ou o servidor está inacessível.';
       } else {
-        // Erro na configuração da requisição
         console.error('Erro na configuração da requisição:', error.message);
         errorMessage = `Erro: ${error.message}`;
       }
       
-      // Mostrar alerta com detalhes
-      alert(`${errorMessage}\n\nVerifique o console para mais detalhes ou tente novamente mais tarde.`);
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }

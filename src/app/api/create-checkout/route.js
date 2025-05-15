@@ -152,12 +152,12 @@ export async function POST(request) {
         line_items: [
           {
             price_data: {
-              currency: 'usd',
+              currency: 'brl',
               product_data: {
                 name: 'Site Digital Personalizado',
                 description: `Presente para "${site.title}"`,
               },
-              unit_amount: 400, // $4.00 em centavos
+              unit_amount: 100, // $4.00 em centavos
             },
             quantity: 1,
           },
