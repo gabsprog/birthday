@@ -1,4 +1,5 @@
-// Client-side Cloudinary upload utility
+// src/lib/cloudinaryUpload.js
+// This version uses a more reliable client-side upload method
 
 /**
  * Upload an image directly to Cloudinary from the client

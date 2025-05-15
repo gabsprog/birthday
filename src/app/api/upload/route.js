@@ -1,40 +1,17 @@
+// src/app/api/upload/route.js
 import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import fs from 'fs';
+import { join } from 'path';
+import os from 'os';
 
-// Configure Cloudinary specifically for serverless environment
+// Configure Cloudinary with explicit configuration
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true, // Always use HTTPS
-  private_cdn: false,
-  secure_distribution: null
+  secure: true
 });
-
-// Helper function to handle file upload without streaming
-async function uploadToCloudinary(buffer, options = {}) {
-  return new Promise((resolve, reject) => {
-    const uploadOptions = {
-      resource_type: 'auto',
-      timeout: 60000, // 60 second timeout
-      ...options
-    };
-    
-    // Use upload_chunked for better reliability in serverless environments
-    cloudinary.uploader.upload_large(
-      `data:${options.fileType || 'image/jpeg'};base64,${buffer.toString('base64')}`,
-      uploadOptions,
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary error details:', error);
-          reject(error);
-        } else {
-          resolve(result);
-        }
-      }
-    );
-  });
-}
 
 export async function POST(request) {
   console.log('Upload request received');
@@ -118,18 +95,34 @@ export async function POST(request) {
     
     console.log('Uploading to Cloudinary folder:', folderName);
     
-    // Upload to Cloudinary with base64 encoding (better for serverless)
+    // Use Base64 Encoded Upload instead of stream or temp file
     try {
-      const uploadResult = await uploadToCloudinary(buffer, {
-        folder: folderName,
-        fileType: file.type,
-        transformation: [
-          { width: 1200, crop: 'limit' }, // Reasonable size limit
-          { quality: 'auto:good' }, // Optimize quality
-        ],
-      });
+      const base64Data = buffer.toString('base64');
+      const dataURI = `data:${file.type};base64,${base64Data}`;
       
-      console.log('Upload successful. Public ID:', uploadResult.public_id);
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload(
+          dataURI,
+          {
+            folder: folderName,
+            resource_type: 'image',
+            transformation: [
+              { width: 1200, crop: 'limit' },
+              { quality: 'auto:good' },
+            ],
+            timeout: 60000,
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              reject(error);
+            } else {
+              console.log('Upload successful. Public ID:', result.public_id);
+              resolve(result);
+            }
+          }
+        );
+      });
       
       return NextResponse.json({ 
         success: true, 
@@ -139,18 +132,24 @@ export async function POST(request) {
       
     } catch (uploadError) {
       console.error('Upload to Cloudinary failed:', uploadError);
-      // Provide more detailed error message for debugging
-      let errorDetails = uploadError.toString();
       
-      // Check if this is the HTML error we're seeing
-      if (errorDetails.includes('<!DOCTYPE') || errorDetails.includes('HTML')) {
-        errorDetails = 'Received HTML error page instead of JSON response. This usually indicates an authentication issue or network problem.';
+      // Extract more specific error information
+      let errorMessage = 'Image upload failed';
+      let errorDetails = '';
+      
+      if (uploadError.message) {
+        errorMessage += ': ' + uploadError.message;
+        
+        // Check for the HTML error response that indicates auth/config issues
+        if (uploadError.message.includes('<!DOCTYPE')) {
+          errorDetails = 'Authentication error with Cloudinary. Please check your credentials.';
+        }
       }
       
       return NextResponse.json(
         { 
-          error: 'Image upload failed: ' + uploadError.message,
-          details: errorDetails
+          error: errorMessage,
+          details: errorDetails || uploadError.toString()
         },
         { status: 500 }
       );

@@ -1,5 +1,6 @@
 // src/app/api/cloudinary-signature/route.js
-// This endpoint generates a signature for client-side Cloudinary uploads
+// Create a server-side signature for secure client-side uploads
+
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -11,6 +12,7 @@ export async function GET(request) {
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
     
     if (!cloudName || !apiKey || !apiSecret) {
+      console.error('Missing Cloudinary credentials');
       return NextResponse.json(
         { error: 'Cloudinary credentials not configured' },
         { status: 500 }
@@ -28,7 +30,7 @@ export async function GET(request) {
     const params = {
       timestamp: timestamp,
       folder: folderName,
-      upload_preset: 'ml_default', // Change this to your unsigned upload preset name if you have one
+      upload_preset: 'ml_default', // You can create a dedicated upload preset in your Cloudinary dashboard
       api_key: apiKey
     };
     
