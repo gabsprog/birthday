@@ -1,24 +1,41 @@
-// src/app/api/upload/route.js
+// Replace the contents of src/app/api/upload/route.js with this:
+
 import { NextResponse } from 'next/server';
-import axios from 'axios';
-import FormData from 'form-data';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary with explicit configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
+});
 
 export async function POST(request) {
-  console.log('Upload request received (ImgBB implementation)');
+  console.log('Upload request received');
   
   try {
-    // Check if ImgBB API key is configured
-    const imgbbApiKey = process.env.IMGBB_API_KEY;
-    if (!imgbbApiKey) {
-      console.error('ImgBB API key is not configured');
+    // Check Cloudinary configuration
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('Cloudinary environment variables are not configured correctly');
       return NextResponse.json(
         { error: 'Server configuration error: Image service not properly configured' },
         { status: 500 }
       );
     }
 
-    // Get form data
-    const formData = await request.formData();
+    // Get form data with better error handling
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (formError) {
+      console.error('Error parsing form data:', formError);
+      return NextResponse.json(
+        { error: 'Could not parse form data: ' + formError.message },
+        { status: 400 }
+      );
+    }
+    
     const file = formData.get('file');
     
     if (!file) {
@@ -55,83 +72,93 @@ export async function POST(request) {
       );
     }
     
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    console.log('Buffer created successfully, size:', buffer.length, 'bytes');
+    // Convert file to buffer with error handling
+    let arrayBuffer, buffer;
+    try {
+      arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      console.log('Buffer created successfully, size:', buffer.length, 'bytes');
+    } catch (bufferError) {
+      console.error('Error converting file to buffer:', bufferError);
+      return NextResponse.json(
+        { error: 'Error processing file: ' + bufferError.message },
+        { status: 500 }
+      );
+    }
     
-    // Convert buffer to base64
-    const base64Image = buffer.toString('base64');
-    
-    // Create timestamp folder name for organization similar to the original code
+    // Create a unique folder name based on timestamp and random string
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 7);
-    const folderName = `birthdaylove_${timestamp}_${randomStr}`;
+    const folderName = `birthdaylove/${timestamp}_${randomStr}`;
     
-    console.log('Uploading to ImgBB with folder name as a name prefix:', folderName);
+    console.log('Uploading to Cloudinary folder:', folderName);
     
-    // Create FormData for ImgBB upload
-    const imgbbFormData = new FormData();
-    imgbbFormData.append('key', imgbbApiKey);
-    imgbbFormData.append('image', base64Image);
-    imgbbFormData.append('name', `${folderName}_${file.name}`);
-    
-    // Upload to ImgBB
-    const response = await axios.post('https://api.imgbb.com/1/upload', imgbbFormData, {
-      headers: {
-        ...imgbbFormData.getHeaders(),
-      },
-      timeout: 30000, // 30 second timeout
-    });
-    
-    // Handle response
-    if (response.data.success) {
-      console.log('Upload to ImgBB successful');
+    // Use Base64 Encoded Upload instead of stream or temp file
+    try {
+      const base64Data = buffer.toString('base64');
+      const dataURI = `data:${file.type};base64,${base64Data}`;
       
-      return NextResponse.json({
-        success: true,
-        url: response.data.data.url,           // Direct image URL
-        display_url: response.data.data.display_url, // URL to the image display page
-        thumb_url: response.data.data.thumb.url,    // Thumbnail URL
-        delete_url: response.data.data.delete_url,  // URL to delete the image
-        public_id: response.data.data.id           // Image ID on ImgBB
+      const uploadResult = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload(
+          dataURI,
+          {
+            folder: folderName,
+            resource_type: 'image',
+            transformation: [
+              { width: 1200, crop: 'limit' },
+              { quality: 'auto:good' },
+            ],
+            timeout: 60000,
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              reject(error);
+            } else {
+              console.log('Upload successful. Public ID:', result.public_id);
+              resolve(result);
+            }
+          }
+        );
       });
-    } else {
-      console.error('ImgBB API returned error:', response.data);
+      
+      return NextResponse.json({ 
+        success: true, 
+        url: uploadResult.secure_url,
+        public_id: uploadResult.public_id
+      });
+      
+    } catch (uploadError) {
+      console.error('Upload to Cloudinary failed:', uploadError);
+      
+      // Extract more specific error information
+      let errorMessage = 'Image upload failed';
+      let errorDetails = '';
+      
+      if (uploadError.message) {
+        errorMessage += ': ' + uploadError.message;
+        
+        // Check for the HTML error response that indicates auth/config issues
+        if (uploadError.message.includes('<!DOCTYPE')) {
+          errorDetails = 'Authentication error with Cloudinary. Please check your credentials.';
+        }
+      }
+      
       return NextResponse.json(
-        { error: 'Image upload failed on ImgBB' },
+        { 
+          error: errorMessage,
+          details: errorDetails || uploadError.toString()
+        },
         { status: 500 }
       );
     }
     
   } catch (error) {
     console.error('Unexpected error during upload:', error);
-    
-    // Detailed error logging
-    let errorMessage = 'Failed to upload image';
-    let errorDetails = '';
-    
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Error response data:', error.response.data);
-      console.error('Error response status:', error.response.status);
-      errorMessage += `: Server responded with ${error.response.status}`;
-      errorDetails = JSON.stringify(error.response.data);
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-      errorMessage += ': No response received from server';
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Error message:', error.message);
-      errorMessage += `: ${error.message}`;
-    }
-    
     return NextResponse.json(
       { 
-        error: errorMessage,
-        details: errorDetails
+        error: 'Failed to upload image: ' + error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );
