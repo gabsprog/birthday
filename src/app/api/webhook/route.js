@@ -1,5 +1,4 @@
-// Atualização para src/app/api/webhook/route.js
-
+// src/app/api/webhook/route.js - Versão corrigida
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import stripe from '@/lib/stripe';
@@ -7,7 +6,6 @@ import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
 import { sendSiteEmail } from '@/lib/email';
 
-// Configuração da rota
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const preferredRegion = 'auto';
@@ -17,6 +15,8 @@ export async function POST(request) {
     const body = await request.text();
     const signature = headers().get('stripe-signature');
     
+    console.log(`Webhook recebido: ${new Date().toISOString()}`);
+    
     if (!signature) {
       console.error('Assinatura do Stripe ausente');
       return NextResponse.json(
@@ -25,8 +25,8 @@ export async function POST(request) {
       );
     }
     
+    // Verificar assinatura do webhook
     let event;
-    
     try {
       event = stripe.webhooks.constructEvent(
         body,
@@ -41,15 +41,12 @@ export async function POST(request) {
       );
     }
     
-    // Lidar com o evento
-    console.log('Evento recebido do Stripe:', event.type);
+    console.log(`Evento recebido do Stripe: ${event.type} - ${event.id}`);
     
-    // Atualização principal: adicionar suporte para checkout.session.completed
+    // Tratar eventos de pagamento bem-sucedido
     if (event.type === 'checkout.session.completed') {
-      // Processar evento checkout.session.completed
       await handleCheckoutSessionCompleted(event.data.object);
     } else if (event.type === 'payment_intent.succeeded') {
-      // Manter o processamento do payment_intent.succeeded para backward compatibility
       await handlePaymentIntentSucceeded(event.data.object);
     }
     
@@ -63,35 +60,56 @@ export async function POST(request) {
   }
 }
 
-// Nova função para processar checkout.session.completed
+// Função para processar checkout.session.completed
 async function handleCheckoutSessionCompleted(session) {
-  // Extrair siteId dos metadados
-  const { siteId } = session.metadata;
+  const { siteId, slug } = session.metadata;
   
-  if (!siteId) {
-    console.error('siteId ausente nos metadados da sessão');
+  if (!siteId && !slug) {
+    console.error('siteId e slug ausentes nos metadados da sessão');
     return;
   }
   
-  console.log(`Processando pagamento completado para o site: ${siteId}`);
+  console.log(`Processando pagamento completado para: ${siteId || slug}`);
   
   // Conectar ao banco de dados
-  await connectToDatabase();
+  try {
+    await connectToDatabase();
+  } catch (dbError) {
+    console.error(`Erro de conexão ao banco de dados: ${dbError.message}`);
+    throw dbError;
+  }
   
-  // Encontrar o site
-  const site = await Site.findById(siteId);
+  // Encontrar o site por ID ou slug
+  let site;
+  if (siteId) {
+    site = await Site.findById(siteId);
+  } else if (slug) {
+    site = await Site.findOne({ slug });
+  }
   
   if (!site) {
-    console.error(`Site não encontrado: ${siteId}`);
+    console.error(`Site não encontrado: ${siteId || slug}`);
+    return;
+  }
+  
+  // Verificar se o site já está marcado como pago
+  if (site.paid) {
+    console.log(`Site ${site._id} (${site.slug}) já está marcado como pago`);
     return;
   }
   
   // Atualizar o site
   site.paid = true;
-  site.expiresAt = null; // Remover data de expiração (o site agora é permanente)
-  await site.save();
+  site.expiresAt = null; // Remover data de expiração
+  site.checkoutSessionId = session.id; // Armazenar ID da sessão
   
-  console.log(`Site ${siteId} marcado como pago com sucesso`);
+  try {
+    await site.save();
+    console.log(`Site ${site._id} (${site.slug}) marcado como pago com sucesso!`);
+  } catch (saveError) {
+    console.error(`Erro ao salvar site: ${saveError.message}`);
+    throw saveError;
+  }
   
   // Enviar email para o cliente
   const customerEmail = session.customer_email || site.customerEmail;
@@ -105,41 +123,63 @@ async function handleCheckoutSessionCompleted(session) {
   }
 }
 
-// Manter função existente para backward compatibility
+// Função para processar payment_intent.succeeded
 async function handlePaymentIntentSucceeded(paymentIntent) {
-  // Extrair metadados
-  const { siteId, customerEmail } = paymentIntent.metadata;
+  const { siteId, slug } = paymentIntent.metadata;
   
-  if (!siteId) {
-    console.error('siteId ausente nos metadados do paymentIntent');
+  if (!siteId && !slug) {
+    console.error('siteId e slug ausentes nos metadados do paymentIntent');
     return;
   }
   
-  console.log(`Processando payment_intent.succeeded para o site: ${siteId}`);
+  console.log(`Processando payment_intent.succeeded para: ${siteId || slug}`);
   
   // Conectar ao banco de dados
-  await connectToDatabase();
+  try {
+    await connectToDatabase();
+  } catch (dbError) {
+    console.error(`Erro de conexão ao banco de dados: ${dbError.message}`);
+    throw dbError;
+  }
   
-  // Encontrar o site
-  const site = await Site.findById(siteId);
+  // Encontrar o site por ID ou slug
+  let site;
+  if (siteId) {
+    site = await Site.findById(siteId);
+  } else if (slug) {
+    site = await Site.findOne({ slug });
+  }
   
   if (!site) {
-    console.error(`Site não encontrado: ${siteId}`);
+    console.error(`Site não encontrado: ${siteId || slug}`);
+    return;
+  }
+  
+  // Verificar se o site já está marcado como pago
+  if (site.paid) {
+    console.log(`Site ${site._id} (${site.slug}) já está marcado como pago`);
     return;
   }
   
   // Atualizar o site
   site.paid = true;
-  site.expiresAt = null; // Remover data de expiração (o site agora é permanente)
-  await site.save();
+  site.expiresAt = null; // Remover data de expiração
+  site.paymentIntentId = paymentIntent.id; // Armazenar ID do payment intent
   
-  console.log(`Site ${siteId} marcado como pago com sucesso`);
+  try {
+    await site.save();
+    console.log(`Site ${site._id} (${site.slug}) marcado como pago com sucesso!`);
+  } catch (saveError) {
+    console.error(`Erro ao salvar site: ${saveError.message}`);
+    throw saveError;
+  }
   
   // Enviar email para o cliente
-  if (customerEmail || site.customerEmail) {
+  const customerEmail = site.customerEmail;
+  if (customerEmail) {
     try {
-      await sendSiteEmail(customerEmail || site.customerEmail, site);
-      console.log(`Email enviado para ${customerEmail || site.customerEmail}`);
+      await sendSiteEmail(customerEmail, site);
+      console.log(`Email enviado para ${customerEmail}`);
     } catch (emailError) {
       console.error('Erro ao enviar email:', emailError);
     }

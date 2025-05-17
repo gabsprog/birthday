@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
 import dynamic from 'next/dynamic';
+import stripe from '@/lib/stripe';
 
 // Importação dinâmica dos templates para evitar problemas de renderização
 const BirthdayTemplate = dynamic(() => import('@/components/templates/BirthdayTemplate'), { ssr: false });
@@ -46,25 +47,53 @@ export default async function SitePage({ params }) {
       return notFound();
     }
     
-    // Check if the site is paid or not expired
+    // NOVO: Verificar se o site deveria estar pago, mas não está marcado como tal
     if (!site.paid && site.expiresAt && new Date(site.expiresAt) < new Date()) {
-      // Render expired page
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center px-4 py-20 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800 dark:text-white">
-            This Gift Has Expired
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 max-w-md mb-8">
-            This gift was created but never completed the payment process.
-          </p>
-          <a
-            href="/"
-            className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-3 rounded-lg inline-block shadow-md transition-colors"
-          >
-            Create Your Own Gift
-          </a>
-        </div>
-      );
+      // Verificar com o Stripe se houve pagamento
+      let isPaidInStripe = false;
+      
+      // Verificar pagamento se temos checkoutSessionId ou paymentIntentId
+      if (site.checkoutSessionId) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(site.checkoutSessionId);
+          isPaidInStripe = session.payment_status === 'paid';
+        } catch (stripeError) {
+          console.error('Erro ao verificar sessão do Stripe:', stripeError);
+        }
+      } else if (site.paymentIntentId) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(site.paymentIntentId);
+          isPaidInStripe = paymentIntent.status === 'succeeded';
+        } catch (stripeError) {
+          console.error('Erro ao verificar payment intent do Stripe:', stripeError);
+        }
+      }
+      
+      // Se o pagamento foi confirmado no Stripe, atualizar o site
+      if (isPaidInStripe) {
+        site.paid = true;
+        site.expiresAt = null;
+        await site.save();
+        console.log(`Site ${slug} recuperado e marcado como pago!`);
+      } else {
+        // Render expired page
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center px-4 py-20 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800 dark:text-white">
+              This Gift Has Expired
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mb-8">
+              This gift was created but never completed the payment process.
+            </p>
+            <a
+              href="/"
+              className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-3 rounded-lg inline-block shadow-md transition-colors"
+            >
+              Create Your Own Gift
+            </a>
+          </div>
+        );
+      }
     }
     
     // Preparar dados seguros para renderização 
