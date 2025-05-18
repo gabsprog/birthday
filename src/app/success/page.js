@@ -31,7 +31,6 @@ function SuccessContent() {
     const fetchSite = async () => {
       try {
         console.log('Fetching site data for ID:', siteId);
-        // Fetch the site data 
         const response = await axios.get(`/api/site/${siteId}`);
         console.log('API response:', response.data);
         
@@ -39,7 +38,6 @@ function SuccessContent() {
           setSite(response.data.site);
           console.log('Site data loaded successfully:', response.data.site);
           
-          // Calcular a URL do site separadamente, não no render
           if (response.data.site.slug) {
             const origin = window.location.origin;
             setSiteUrl(`${origin}/${response.data.site.slug}`);
@@ -50,7 +48,6 @@ function SuccessContent() {
       } catch (error) {
         console.error('Error fetching site:', error);
         
-        // Log more details about the error
         if (error.response) {
           console.error('Error response:', error.response.data);
           console.error('Error status:', error.response.status);
@@ -62,11 +59,10 @@ function SuccessContent() {
       }
     };
     
-    // Add a longer delay to ensure webhook has time to process
     console.log('Waiting for webhook processing...');
     const timer = setTimeout(() => {
       fetchSite();
-    }, 5000); // Increase to 5 seconds
+    }, 5000); // Increased delay for webhook
     
     return () => clearTimeout(timer);
   }, [siteId, searchParams]);
@@ -76,8 +72,8 @@ function SuccessContent() {
       {isLoading ? (
         <div className="text-center">
           <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Processando seu pagamento...</p>
-          <p className="text-sm text-gray-500 mt-2">Isso pode levar alguns momentos.</p>
+          <p className="text-gray-600 font-medium">Processing your payment...</p>
+          <p className="text-sm text-gray-500 mt-2">This might take a few moments.</p>
         </div>
       ) : error ? (
         <div className="text-center">
@@ -85,25 +81,25 @@ function SuccessContent() {
             <p>{error}</p>
           </div>
           <p className="mb-6 text-gray-600">
-            Seu pagamento foi processado com sucesso. Você receberá um email com o link do seu site em breve.
+            Your payment was processed successfully. You will receive an email with your site link shortly.
           </p>
           <Link 
             href="/"
             className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
           >
-            Voltar para a Página Inicial
+            Return to Home Page
           </Link>
         </div>
       ) : (
         <div className="text-center">
           <div className="bg-green-50 text-green-600 p-4 rounded-lg mb-6">
-            <h1 className="text-2xl font-bold mb-2">Pagamento bem-sucedido!</h1>
-            <p>Seu presente especial está pronto para ser compartilhado.</p>
+            <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
+            <p>Your special gift is ready to be shared.</p>
           </div>
           
           {site && siteUrl && (
             <div className="mt-6">
-              <h2 className="text-xl font-semibold mb-2">Link do seu Site</h2>
+              <h2 className="text-xl font-semibold mb-2">Your Site Link</h2>
               <div className="bg-gray-50 p-3 rounded-lg mb-4 text-left overflow-x-auto">
                 <code className="text-blue-600 text-sm break-all">{siteUrl}</code>
               </div>
@@ -112,11 +108,11 @@ function SuccessContent() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(siteUrl);
-                    alert('Link copiado para a área de transferência!');
+                    alert('Link copied to clipboard!');
                   }}
                   className="border border-blue-500 text-blue-500 py-2 px-4 rounded hover:bg-blue-50"
                 >
-                  Copiar Link
+                  Copy Link
                 </button>
                 
                 <a
@@ -125,19 +121,21 @@ function SuccessContent() {
                   rel="noopener noreferrer"
                   className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded font-medium"
                 >
-                  Visitar seu Site
+                  Visit Your Site
                 </a>
               </div>
             </div>
           )}
           
           <div className="border-t border-gray-200 mt-8 pt-6">
-            <p className="text-gray-600 mb-6">Seu pagamento foi processado com sucesso. Também enviamos um email com o link do seu site.</p>
+            <p className="text-gray-600 mb-6">
+              Your payment was processed successfully. We also sent you an email with your site link.
+            </p>
             <Link 
               href="/create"
               className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded"
             >
-              Criar Outro Presente
+              Create Another Gift
             </Link>
           </div>
         </div>
@@ -152,7 +150,7 @@ export default function SuccessPage() {
       <Suspense fallback={
         <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg text-center">
           <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Carregando...</p>
+          <p className="text-gray-600 font-medium">Loading...</p>
         </div>
       }>
         <SuccessContent />

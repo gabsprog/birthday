@@ -535,7 +535,7 @@ const SiteEditor = ({
                       />
 
                       <Input
-                        label="Custom Age (deixe em branco para calcular automaticamente)"
+                        label="Custom Age"
                         value={formData.birthday.customAge || ''}
                         onChange={(e) => handleTemplateTextChange('birthday', 'customAge', e.target.value)}
                         placeholder="Ex: 30"
