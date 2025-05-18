@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.2",
+    "@sendgrid/mail": "^8.1.5",
     "@stripe/react-stripe-js": "^3.7.0",
     "@stripe/stripe-js": "^2.4.0",
     "axios": "^1.9.0",

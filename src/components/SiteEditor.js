@@ -15,14 +15,38 @@ import { validateYoutubeUrl, isValidEmail } from '@/lib/utils';
 import Select from './ui/Select';
 import { Tab } from '@headlessui/react';
 
-const SiteEditor = () => {
+const SiteEditor = ({ 
+    initialData = null, 
+    editMode = false, 
+    editHash = null,
+    onUpdateSuccess = () => {} 
+  }) => {
+  
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [currentTab, setCurrentTab] = useState(0);
   
   // Extended form state for full customization
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(
+    initialData ? 
+    {
+      templateType: initialData.templateType,
+      title: initialData.title,
+      message: initialData.message,
+      specialDate: initialData.specialDate ? new Date(initialData.specialDate).toISOString().split('T')[0] : '',
+      youtubeLink: initialData.youtubeLink || '',
+      customerEmail: initialData.customerEmail || '',
+      images: initialData.images || [],
+      
+      // Template-specific data
+      birthday: initialData.birthday || { /* default birthday values */ },
+      anniversary: initialData.anniversary || { /* default anniversary values */ },
+      declaration: initialData.declaration || { /* default declaration values */ }
+    } 
+    : 
+    {
+
     templateType: 'birthday',
     title: '',
     message: '',
@@ -251,10 +275,13 @@ const SiteEditor = () => {
       }
     }
     
-    if (!formData.customerEmail) {
-      errors.customerEmail = 'Email is required';
-    } else if (!isValidEmail(formData.customerEmail)) {
-      errors.customerEmail = 'Please enter a valid email address';
+    // Só validar email se não estiver no modo de edição
+    if (!editMode) {
+      if (!formData.customerEmail) {
+        errors.customerEmail = 'Email is required';
+      } else if (!isValidEmail(formData.customerEmail)) {
+        errors.customerEmail = 'Please enter a valid email address';
+      }
     }
     
     return errors;
@@ -276,54 +303,85 @@ const SiteEditor = () => {
     setIsLoading(true);
     
     try {
-      // Adicionar log para depuração
-      console.log('Iniciando processo de criação do site...');
-      console.log('Dados do formulário:', {
-        templateType: formData.templateType,
-        title: formData.title,
-        customerEmail: formData.customerEmail,
-        // Não logar a mensagem completa por privacidade
-      });
-      
-      // Criar o site
-      console.log('Enviando requisição para /api/create-site...');
-      const createSiteResponse = await axios.post('/api/create-site', formData, {
-        timeout: 30000, // Aumentar timeout para 30 segundos
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      console.log('Resposta recebida de create-site:', createSiteResponse.data);
-      
-      if (createSiteResponse.data.success) {
-        const siteId = createSiteResponse.data.siteId;
+      if (editMode) {
+        // Se estamos no modo de edição, enviamos uma requisição PUT para a API de edição
+        console.log('Atualizando site existente...');
         
-        // Criar a sessão de checkout
-        console.log('Criando sessão de checkout para o site:', siteId);
-        const checkoutResponse = await axios.post('/api/create-checkout', {
-          siteId: siteId
+        // Prepare dados para atualização - não inclua customerEmail em edições
+        const updateData = { ...formData };
+        delete updateData.customerEmail; // Não permitir alterar o email nas edições
+        
+        // Adicionar o editHash para autenticação
+        updateData.editHash = editHash;
+        updateData.slug = initialData.slug;
+        
+        const updateResponse = await axios.put('/api/edit-site', updateData, {
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json',
+          }
         });
         
-        console.log('Resposta de checkout:', checkoutResponse.data);
+        console.log('Resposta de atualização:', updateResponse.data);
         
-        if (checkoutResponse.data.success) {
-          // Se já estiver pago, redirecionar para a página de sucesso
-          if (checkoutResponse.data.paid) {
-            router.push(`/success?site_id=${siteId}`);
-            return;
-          }
-          
-          // Redirecionar para a página de checkout do Stripe
-          console.log('Redirecionando para:', checkoutResponse.data.url);
-          window.location.href = checkoutResponse.data.url;
+        if (updateResponse.data.success) {
+          // Notificar que a atualização foi bem-sucedida
+          alert('Site atualizado com sucesso!');
+          onUpdateSuccess();
         } else {
-          console.error('Erro na resposta do checkout:', checkoutResponse.data);
-          alert('Erro ao criar a sessão de pagamento. Por favor, tente novamente.');
+          console.error('Erro na resposta de atualização:', updateResponse.data);
+          alert('Erro ao atualizar o site. Por favor, tente novamente.');
         }
       } else {
-        console.error('Erro na resposta de criação do site:', createSiteResponse.data);
-        alert('Erro ao criar o site. Por favor, tente novamente.');
+        // Adicionar log para depuração
+        console.log('Iniciando processo de criação do site...');
+        console.log('Dados do formulário:', {
+          templateType: formData.templateType,
+          title: formData.title,
+          customerEmail: formData.customerEmail,
+          // Não logar a mensagem completa por privacidade
+        });
+        
+        // Criar o site
+        console.log('Enviando requisição para /api/create-site...');
+        const createSiteResponse = await axios.post('/api/create-site', formData, {
+          timeout: 30000, // Aumentar timeout para 30 segundos
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log('Resposta recebida de create-site:', createSiteResponse.data);
+        
+        if (createSiteResponse.data.success) {
+          const siteId = createSiteResponse.data.siteId;
+          
+          // Criar a sessão de checkout
+          console.log('Criando sessão de checkout para o site:', siteId);
+          const checkoutResponse = await axios.post('/api/create-checkout', {
+            siteId: siteId
+          });
+          
+          console.log('Resposta de checkout:', checkoutResponse.data);
+          
+          if (checkoutResponse.data.success) {
+            // Se já estiver pago, redirecionar para a página de sucesso
+            if (checkoutResponse.data.paid) {
+              router.push(`/success?site_id=${siteId}`);
+              return;
+            }
+            
+            // Redirecionar para a página de checkout do Stripe
+            console.log('Redirecionando para:', checkoutResponse.data.url);
+            window.location.href = checkoutResponse.data.url;
+          } else {
+            console.error('Erro na resposta do checkout:', checkoutResponse.data);
+            alert('Erro ao criar a sessão de pagamento. Por favor, tente novamente.');
+          }
+        } else {
+          console.error('Erro na resposta de criação do site:', createSiteResponse.data);
+          alert('Erro ao criar o site. Por favor, tente novamente.');
+        }
       }
     } catch (error) {
       console.error('Erro durante o processo:', error);
@@ -517,18 +575,20 @@ const SiteEditor = () => {
                         rows={8}
                       />
                       
-                      {/* Email */}
-                      <Input
-                        id="customerEmail"
-                        name="customerEmail"
-                        type="email"
-                        label="Your Email"
-                        placeholder="We'll send the site link to this email"
-                        value={formData.customerEmail}
-                        onChange={handleChange}
-                        error={formErrors.customerEmail}
-                        required
-                      />
+                      {!editMode && (
+                        <Input
+                          id="customerEmail"
+                          name="customerEmail"
+                          type="email"
+                          label="Your Email"
+                          placeholder="We'll send the site link to this email"
+                          value={formData.customerEmail}
+                          onChange={handleChange}
+                          error={formErrors.customerEmail}
+                          required
+                        />
+                      )}
+                      
                     </div>
                   </Tab.Panel>
                   
@@ -1027,11 +1087,17 @@ const SiteEditor = () => {
                 fullWidth
                 size="lg"
               >
-                Continue to Payment ($4.00)
+                {editMode ? 'Save Changes' : 'Continue to Payment ($4.00)'}
               </Button>
-              <p className="mt-2 text-center text-sm text-gray-500">
-                You'll be redirected to our secure payment page
-              </p>
+              {editMode ? (
+                <p className="mt-2 text-center text-sm text-gray-500">
+                  Changes will be available immediately after saving
+                </p>
+              ) : (
+                <p className="mt-2 text-center text-sm text-gray-500">
+                  You will be redirected to our secure payment page
+                </p>
+              )}
             </div>
           </form>
         </div>

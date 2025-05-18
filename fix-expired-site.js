@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 require('dotenv').config({ path: '.env.local' });
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const SITE_SLUG = 'f8cbe86b'; // Substitua pelo slug real da URL
+const SITE_SLUG = '0de0accb'; // Substitua pelo slug real da URL
 
 if (!MONGODB_URI) {
   console.error('MONGODB_URI não está definido nas variáveis de ambiente');

@@ -1,8 +1,11 @@
+// src/app/[slug]/page.js (versão corrigida)
+
 import { notFound } from 'next/navigation';
 import connectToDatabase from '@/lib/mongodb';
 import Site from '@/models/Site';
 import dynamic from 'next/dynamic';
 import stripe from '@/lib/stripe';
+import UpdateNotification from './UpdateNotification';
 
 // Importação dinâmica dos templates para evitar problemas de renderização
 const BirthdayTemplate = dynamic(() => import('@/components/templates/BirthdayTemplate'), { ssr: false });
@@ -166,16 +169,21 @@ export default async function SitePage({ params }) {
     
     // Renderizar o template apropriado com client-side rendering
     // O "noSSR" é crucial para evitar problemas de hidratação
-    switch (site.templateType) {
-      case 'birthday':
-        return <BirthdayTemplate {...safeProps} />;
-      case 'anniversary':
-        return <AnniversaryTemplate {...safeProps} />;
-      case 'declaration':
-        return <DeclarationTemplate {...safeProps} />;
-      default:
-        return <BirthdayTemplate {...safeProps} />;
-    }
+    return (
+      <>
+        <UpdateNotification />
+        
+        {site.templateType === 'birthday' ? (
+          <BirthdayTemplate {...safeProps} />
+        ) : site.templateType === 'anniversary' ? (
+          <AnniversaryTemplate {...safeProps} />
+        ) : site.templateType === 'declaration' ? (
+          <DeclarationTemplate {...safeProps} />
+        ) : (
+          <BirthdayTemplate {...safeProps} />
+        )}
+      </>
+    );
     
   } catch (error) {
     console.error('Error fetching site:', error);
