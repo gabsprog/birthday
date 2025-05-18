@@ -1,16 +1,9 @@
-import nodemailer from 'nodemailer';
+// src/lib/email.js - Updated with Resend
+import { Resend } from 'resend';
 import QRCode from 'qrcode';
 
-// Create reusable transporter object using SMTP transport
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendSiteEmail(email, site) {
   const siteUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/${site.slug}`;
@@ -26,7 +19,7 @@ export async function sendSiteEmail(email, site) {
     },
   });
   
-  // Email template with inline styles
+  // Email template with inline styles - Updated for Resend
   const htmlContent = `
     <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
       <div style="text-align: center; margin-bottom: 30px;">
@@ -69,8 +62,9 @@ export async function sendSiteEmail(email, site) {
   `;
 
   try {
-    await transporter.sendMail({
-      from: `"BirthdayLove" <${process.env.EMAIL_USER}>`,
+    // Send email using Resend
+    const { data, error } = await resend.emails.send({
+      from: `BirthdayLove <noreply@birthdaylove.site>`,
       to: email,
       subject: 'Your Special Website is Ready! 🎉',
       html: htmlContent,
@@ -81,7 +75,13 @@ export async function sendSiteEmail(email, site) {
       }],
     });
     
-    return { success: true };
+    if (error) {
+      console.error('Error sending email with Resend:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('Email sent successfully with Resend:', data);
+    return { success: true, data };
   } catch (error) {
     console.error('Error sending email:', error);
     return { success: false, error: error.message };

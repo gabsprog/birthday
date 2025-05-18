@@ -1,4 +1,4 @@
-// src/app/api/webhook/route.js - Versão corrigida
+// src/app/api/webhook/route.js - Updated email import
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import stripe from '@/lib/stripe';
@@ -14,18 +14,18 @@ export async function POST(request) {
   try {
     const body = await request.text();
     const signature = headers().get('stripe-signature');
-    
-    console.log(`Webhook recebido: ${new Date().toISOString()}`);
-    
+
+    console.log(`Webhook received: ${new Date().toISOString()}`);
+
     if (!signature) {
-      console.error('Assinatura do Stripe ausente');
+      console.error('Stripe signature missing');
       return NextResponse.json(
-        { error: 'Assinatura ausente' },
+        { error: 'Signature missing' },
         { status: 400 }
       );
     }
-    
-    // Verificar assinatura do webhook
+
+    // Verify webhook signature
     let event;
     try {
       event = stripe.webhooks.constructEvent(
@@ -34,154 +34,162 @@ export async function POST(request) {
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (error) {
-      console.error(`Falha na verificação da assinatura: ${error.message}`);
+      console.error(`Signature verification failed: ${error.message}`);
       return NextResponse.json(
-        { error: 'Assinatura inválida' },
+        { error: 'Invalid signature' },
         { status: 400 }
       );
     }
-    
-    console.log(`Evento recebido do Stripe: ${event.type} - ${event.id}`);
-    
-    // Tratar eventos de pagamento bem-sucedido
+
+    console.log(`Received Stripe event: ${event.type} - ${event.id}`);
+
+    // Handle successful payment events
     if (event.type === 'checkout.session.completed') {
       await handleCheckoutSessionCompleted(event.data.object);
     } else if (event.type === 'payment_intent.succeeded') {
       await handlePaymentIntentSucceeded(event.data.object);
     }
-    
+
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Erro ao processar webhook:', error);
+    console.error('Error processing webhook:', error);
     return NextResponse.json(
-      { error: 'Falha ao processar webhook' },
+      { error: 'Failed to process webhook' },
       { status: 500 }
     );
   }
 }
 
-// Função para processar checkout.session.completed
+// Function to process checkout.session.completed
 async function handleCheckoutSessionCompleted(session) {
   const { siteId, slug } = session.metadata;
-  
+
   if (!siteId && !slug) {
-    console.error('siteId e slug ausentes nos metadados da sessão');
+    console.error('siteId and slug missing in session metadata');
     return;
   }
-  
-  console.log(`Processando pagamento completado para: ${siteId || slug}`);
-  
-  // Conectar ao banco de dados
+
+  console.log(`Processing payment completed for: ${siteId || slug}`);
+
+  // Connect to the database
   try {
     await connectToDatabase();
   } catch (dbError) {
-    console.error(`Erro de conexão ao banco de dados: ${dbError.message}`);
+    console.error(`Database connection error: ${dbError.message}`);
     throw dbError;
   }
-  
-  // Encontrar o site por ID ou slug
+
+  // Find the site by ID or slug
   let site;
   if (siteId) {
     site = await Site.findById(siteId);
   } else if (slug) {
     site = await Site.findOne({ slug });
   }
-  
+
   if (!site) {
-    console.error(`Site não encontrado: ${siteId || slug}`);
+    console.error(`Site not found: ${siteId || slug}`);
     return;
   }
-  
-  // Verificar se o site já está marcado como pago
+
+  // Check if the site is already marked as paid
   if (site.paid) {
-    console.log(`Site ${site._id} (${site.slug}) já está marcado como pago`);
+    console.log(`Site ${site._id} (${site.slug}) is already marked as paid`);
     return;
   }
-  
-  // Atualizar o site
+
+  // Update the site
   site.paid = true;
-  site.expiresAt = null; // Remover data de expiração
-  site.checkoutSessionId = session.id; // Armazenar ID da sessão
-  
+  site.expiresAt = null; // Remove expiration date
+  site.checkoutSessionId = session.id; // Store session ID
+
   try {
     await site.save();
-    console.log(`Site ${site._id} (${site.slug}) marcado como pago com sucesso!`);
+    console.log(`Site ${site._id} (${site.slug}) successfully marked as paid!`);
   } catch (saveError) {
-    console.error(`Erro ao salvar site: ${saveError.message}`);
+    console.error(`Error saving site: ${saveError.message}`);
     throw saveError;
   }
-  
-  // Enviar email para o cliente
+
+  // Send email to the customer
   const customerEmail = session.customer_email || site.customerEmail;
   if (customerEmail) {
     try {
-      await sendSiteEmail(customerEmail, site);
-      console.log(`Email enviado para ${customerEmail}`);
+      const emailResult = await sendSiteEmail(customerEmail, site);
+      if (emailResult.success) {
+        console.log(`Email sent to ${customerEmail} successfully`);
+      } else {
+        console.error('Error sending email:', emailResult.error);
+      }
     } catch (emailError) {
-      console.error('Erro ao enviar email:', emailError);
+      console.error('Error sending email:', emailError);
     }
   }
 }
 
-// Função para processar payment_intent.succeeded
+// Function to process payment_intent.succeeded
 async function handlePaymentIntentSucceeded(paymentIntent) {
   const { siteId, slug } = paymentIntent.metadata;
-  
+
   if (!siteId && !slug) {
-    console.error('siteId e slug ausentes nos metadados do paymentIntent');
+    console.error('siteId and slug missing in paymentIntent metadata');
     return;
   }
-  
-  console.log(`Processando payment_intent.succeeded para: ${siteId || slug}`);
-  
-  // Conectar ao banco de dados
+
+  console.log(`Processing payment_intent.succeeded for: ${siteId || slug}`);
+
+  // Connect to the database
   try {
     await connectToDatabase();
   } catch (dbError) {
-    console.error(`Erro de conexão ao banco de dados: ${dbError.message}`);
+    console.error(`Database connection error: ${dbError.message}`);
     throw dbError;
   }
-  
-  // Encontrar o site por ID ou slug
+
+  // Find the site by ID or slug
   let site;
   if (siteId) {
     site = await Site.findById(siteId);
   } else if (slug) {
     site = await Site.findOne({ slug });
   }
-  
+
   if (!site) {
-    console.error(`Site não encontrado: ${siteId || slug}`);
+    console.error(`Site not found: ${siteId || slug}`);
     return;
   }
-  
-  // Verificar se o site já está marcado como pago
+
+  // Check if the site is already marked as paid
   if (site.paid) {
-    console.log(`Site ${site._id} (${site.slug}) já está marcado como pago`);
+    console.log(`Site ${site._id} (${site.slug}) is already marked as paid`);
     return;
   }
-  
-  // Atualizar o site
+
+  // Update the site
   site.paid = true;
-  site.expiresAt = null; // Remover data de expiração
-  site.paymentIntentId = paymentIntent.id; // Armazenar ID do payment intent
-  
+  site.expiresAt = null; // Remove expiration date
+  site.paymentIntentId = paymentIntent.id; // Store payment intent ID
+
   try {
     await site.save();
-    console.log(`Site ${site._id} (${site.slug}) marcado como pago com sucesso!`);
+    console.log(`Site ${site._id} (${site.slug}) successfully marked as paid!`);
   } catch (saveError) {
-    console.error(`Erro ao salvar site: ${saveError.message}`);
+    console.error(`Error saving site: ${saveError.message}`);
     throw saveError;
   }
-  
-  // Enviar email para o cliente
+
+  // Send email to the customer
   const customerEmail = site.customerEmail;
   if (customerEmail) {
     try {
-      await sendSiteEmail(customerEmail, site);
-      console.log(`Email enviado para ${customerEmail}`);
+      const emailResult = await sendSiteEmail(customerEmail, site);
+      if (emailResult.success) {
+        console.log(`Email sent to ${customerEmail} successfully`);
+      } else {
+        console.error('Error sending email:', emailResult.error);
+      }
     } catch (emailError) {
-      console.error('Erro ao enviar email:', emailError);
+      console.error('Error sending email:', emailError);
     }
   }
 }
